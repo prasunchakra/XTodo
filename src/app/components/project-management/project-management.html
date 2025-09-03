@@ -1,0 +1,296 @@
+<div class="min-h-screen bg-gray-50 p-4">
+  <!-- Header -->
+  <div class="max-w-7xl mx-auto mb-8">
+    <div class="text-center">
+      <h1 class="text-4xl font-bold text-gray-900 mb-2">Project Management</h1>
+      <p class="text-gray-600">Organize your tasks into meaningful projects and goals</p>
+    </div>
+  </div>
+
+  <!-- Add Project Button -->
+  <div class="max-w-7xl mx-auto mb-8">
+    <div class="flex justify-center">
+      <button 
+        pButton 
+        label="Create New Project" 
+        icon="pi pi-plus"
+        (click)="showAddDialog = true"
+        class="px-8 py-3"
+      ></button>
+    </div>
+  </div>
+
+  <!-- Projects Grid -->
+  <div class="max-w-7xl mx-auto">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      
+      <!-- Project Cards -->
+      <div *ngFor="let project of projects" class="group">
+        <p-card class="h-full hover:shadow-lg transition-shadow duration-300">
+          <ng-template pTemplate="header">
+            <div 
+              class="h-24 rounded-t-lg flex items-center justify-center"
+              [style.background-color]="project.color"
+            >
+              <div class="text-center">
+                <h3 
+                  class="text-xl font-bold mb-1"
+                  [class]="getProjectTextColor(project.color)"
+                >
+                  {{ project.name }}
+                </h3>
+                <p 
+                  class="text-sm opacity-90"
+                  [class]="getProjectTextColor(project.color)"
+                >
+                  {{ getTaskCount(project.id) }} tasks
+                </p>
+              </div>
+            </div>
+          </ng-template>
+
+          <ng-template pTemplate="content">
+            <div class="p-4">
+              <!-- Description -->
+              <p *ngIf="project.description" class="text-gray-600 text-sm mb-4">
+                {{ project.description }}
+              </p>
+
+              <!-- Progress Bar -->
+              <div class="mb-4">
+                <div class="flex justify-between text-sm text-gray-600 mb-2">
+                  <span>Progress</span>
+                  <span>{{ getProjectProgress(project.id) }}%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    class="h-2 rounded-full transition-all duration-300"
+                    [style.background-color]="project.color"
+                    [style.width]="getProjectProgress(project.id) + '%'"
+                  ></div>
+                </div>
+              </div>
+
+              <!-- Task Statistics -->
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="text-center">
+                  <div class="text-lg font-semibold text-gray-900">
+                    {{ getTaskCount(project.id) }}
+                  </div>
+                  <div class="text-xs text-gray-500">Total</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-lg font-semibold text-green-600">
+                    {{ getCompletedTaskCount(project.id) }}
+                  </div>
+                  <div class="text-xs text-gray-500">Completed</div>
+                </div>
+              </div>
+
+              <!-- Creation Date -->
+              <div class="text-xs text-gray-400 text-center">
+                Created {{ project.createdAt | date:'shortDate' }}
+              </div>
+            </div>
+          </ng-template>
+
+          <ng-template pTemplate="footer">
+            <div class="flex justify-between items-center">
+              <button 
+                pButton 
+                label="Edit" 
+                icon="pi pi-pencil"
+                size="small"
+                (click)="openEditDialog(project)"
+                class="p-button-text"
+              ></button>
+              
+              <button 
+                pButton 
+                label="Delete" 
+                icon="pi pi-trash"
+                size="small"
+                severity="danger"
+                (click)="deleteProject(project)"
+                class="p-button-text"
+              ></button>
+            </div>
+          </ng-template>
+        </p-card>
+      </div>
+
+      <!-- Empty State -->
+      <div *ngIf="projects.length === 0" class="col-span-full">
+        <div class="text-center py-16">
+          <div class="text-gray-400 mb-4">
+            <i class="pi pi-folder text-8xl"></i>
+          </div>
+          <h3 class="text-xl font-medium text-gray-900 mb-2">No projects yet</h3>
+          <p class="text-gray-600 mb-6">Create your first project to start organizing your tasks!</p>
+          <button 
+            pButton 
+            label="Create Project" 
+            icon="pi pi-plus"
+            (click)="showAddDialog = true"
+          ></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Project Dialog -->
+  <p-dialog 
+    header="Create New Project" 
+    [(visible)]="showAddDialog" 
+    [modal]="true" 
+    [style]="{width: '500px'}"
+    [draggable]="false"
+    [resizable]="false"
+  >
+    <div class="space-y-4">
+      <!-- Project Name -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Project Name *</label>
+        <input 
+          pInputText 
+          type="text" 
+          placeholder="Enter project name..."
+          [(ngModel)]="newProject.name"
+          class="w-full"
+        />
+      </div>
+
+      <!-- Description -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+        <textarea 
+          pTextarea 
+          placeholder="Enter project description..."
+          [(ngModel)]="newProject.description"
+          [rows]="3"
+          class="w-full"
+        ></textarea>
+      </div>
+
+      <!-- Color Selection -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Project Color</label>
+        <div class="flex flex-wrap gap-2">
+          <div 
+            *ngFor="let color of colorPresets"
+            (click)="selectColor(color)"
+            class="w-8 h-8 rounded-full cursor-pointer border-2 transition-all duration-200 hover:scale-110"
+            [style.background-color]="color"
+            [class.border-blue-500]="newProject.color === color"
+            [class.border-gray-300]="newProject.color !== color"
+          ></div>
+        </div>
+        <div class="mt-2">
+          <p-colorPicker 
+            [(ngModel)]="newProject.color"
+            class="w-full"
+          ></p-colorPicker>
+        </div>
+      </div>
+    </div>
+
+    <ng-template pTemplate="footer">
+      <div class="flex justify-end space-x-2">
+        <button 
+          pButton 
+          label="Cancel" 
+          severity="secondary"
+          (click)="showAddDialog = false"
+          class="p-button-text"
+        ></button>
+        <button 
+          pButton 
+          label="Create Project" 
+          icon="pi pi-check"
+          (click)="addProject()"
+        ></button>
+      </div>
+    </ng-template>
+  </p-dialog>
+
+  <!-- Edit Project Dialog -->
+  <p-dialog 
+    header="Edit Project" 
+    [(visible)]="showEditDialog" 
+    [modal]="true" 
+    [style]="{width: '500px'}"
+    [draggable]="false"
+    [resizable]="false"
+  >
+    <div class="space-y-4" *ngIf="editingProject">
+      <!-- Project Name -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Project Name *</label>
+        <input 
+          pInputText 
+          type="text" 
+          placeholder="Enter project name..."
+          [(ngModel)]="editingProject.name"
+          class="w-full"
+        />
+      </div>
+
+      <!-- Description -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+        <textarea 
+          pTextarea 
+          placeholder="Enter project description..."
+          [(ngModel)]="editingProject.description"
+          [rows]="3"
+          class="w-full"
+        ></textarea>
+      </div>
+
+      <!-- Color Selection -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Project Color</label>
+        <div class="flex flex-wrap gap-2">
+          <div 
+            *ngFor="let color of colorPresets"
+            (click)="selectColor(color)"
+            class="w-8 h-8 rounded-full cursor-pointer border-2 transition-all duration-200 hover:scale-110"
+            [style.background-color]="color"
+            [class.border-blue-500]="editingProject.color === color"
+            [class.border-gray-300]="editingProject.color !== color"
+          ></div>
+        </div>
+        <div class="mt-2">
+          <p-colorPicker 
+            [(ngModel)]="editingProject.color"
+            class="w-full"
+          ></p-colorPicker>
+        </div>
+      </div>
+    </div>
+
+    <ng-template pTemplate="footer">
+      <div class="flex justify-end space-x-2">
+        <button 
+          pButton 
+          label="Cancel" 
+          severity="secondary"
+          (click)="showEditDialog = false"
+          class="p-button-text"
+        ></button>
+        <button 
+          pButton 
+          label="Update Project" 
+          icon="pi pi-check"
+          (click)="editProject()"
+        ></button>
+      </div>
+    </ng-template>
+  </p-dialog>
+
+  <!-- Toast Messages -->
+  <p-toast></p-toast>
+
+  <!-- Confirmation Dialog -->
+  <p-confirmDialog></p-confirmDialog>
+</div>

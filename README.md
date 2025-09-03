@@ -1,59 +1,218 @@
-# XtodoClient
+# xTodo - Modern Task Management Application
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.2.1.
+A sophisticated, feature-rich todo application built with Angular 20, PrimeNG, and Tailwind CSS. Organize your tasks, manage projects, and achieve your goals with a beautiful and intuitive interface.
 
-## Development server
+## ✨ Features
 
-To start a local development server, run:
+### 🎯 Core Task Management
+- **Create Tasks**: Add new tasks with titles and optional descriptions
+- **Mark Complete**: Check off completed tasks with smooth animations
+- **Delete Tasks**: Remove tasks with confirmation dialogs
+- **View Task List**: See all your tasks in an organized, filterable list
+
+### 🚀 Advanced Features
+- **Projects/Pledges**: Group tasks under meaningful projects and goals
+- **Due Dates**: Set deadlines and track overdue tasks
+- **Priorities**: Assign Low, Medium, or High priority levels
+- **Smart Filtering**: Search, filter by priority, project, and completion status
+- **Statistics Dashboard**: Track your productivity with real-time metrics
+
+### 🎨 User Experience
+- **Modern UI**: Beautiful, responsive design with PrimeNG components
+- **Tailwind CSS**: Utility-first CSS framework for consistent styling
+- **Responsive Design**: Works perfectly on desktop, tablet, and mobile
+- **Smooth Animations**: Engaging interactions and transitions
+- **Accessibility**: Built with accessibility best practices
+
+## 🛠️ Technology Stack
+
+- **Frontend Framework**: Angular 20 (Standalone Components)
+- **UI Components**: PrimeNG 20
+- **Styling**: Tailwind CSS 4
+- **State Management**: RxJS Observables
+- **Storage**: Local Storage (easily swappable for backend APIs)
+- **Build Tool**: Angular CLI
+- **Package Manager**: npm
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+ 
+- npm 9+ or yarn
+- Angular CLI 20+
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd xtodo-client
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Start the development server**
+   ```bash
+   npm start
+   ```
+
+4. **Open your browser**
+   Navigate to `http://localhost:4200`
+
+### Build for Production
 
 ```bash
-ng serve
+npm run build
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+The build artifacts will be stored in the `dist/` directory.
 
-## Code scaffolding
+## 📁 Project Structure
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+```
+src/
+├── app/
+│   ├── components/
+│   │   ├── todo/                 # Main todo component
+│   │   └── project-management/   # Project management component
+│   ├── models/                   # Data models and interfaces
+│   ├── services/                 # Business logic and data services
+│   ├── app.component.ts         # Main app component
+│   ├── app.routes.ts            # Application routing
+│   └── app.config.ts            # App configuration
+├── assets/                       # Static assets
+└── styles.css                    # Global styles
+```
+
+## 🏗️ Architecture
+
+### Services
+- **StorageService**: Handles data persistence with localStorage
+- **TaskService**: Manages task business logic and filtering
+
+### Components
+- **TodoComponent**: Main task management interface
+- **ProjectManagementComponent**: Project creation and management
+
+### Data Models
+- **Task**: Task entity with all properties
+- **Project**: Project/pledge entity
+- **TaskFilters**: Filtering options interface
+
+## 🔧 Configuration
+
+### PrimeNG Theme
+The application uses PrimeNG's Aura theme with custom Tailwind CSS integration.
+
+### Tailwind CSS
+Configured with `tailwindcss-primeui` plugin for seamless integration with PrimeNG components.
+
+## 📱 Responsive Design
+
+The application is fully responsive and optimized for:
+- **Desktop**: Full-featured interface with sidebar navigation
+- **Tablet**: Adaptive layout with optimized touch interactions
+- **Mobile**: Mobile-first design with collapsible sections
+
+## 🎯 Key Features Explained
+
+### Task Management
+- Create tasks with titles, descriptions, priorities, and due dates
+- Assign tasks to projects for better organization
+- Mark tasks as complete with visual feedback
+- Delete tasks with confirmation dialogs
+
+### Project Organization
+- Create custom projects with names, descriptions, and colors
+- Track progress with visual progress bars
+- View task counts and completion statistics
+- Manage project lifecycle (create, edit, delete)
+
+### Smart Filtering
+- Search tasks by title or description
+- Filter by priority level (Low, Medium, High)
+- Filter by project assignment
+- Filter by completion status
+- Filter by due date
+
+### Statistics Dashboard
+- Total task count
+- Active vs. completed tasks
+- Tasks due today
+- Overdue tasks
+- Project progress tracking
+
+## 🔄 Data Persistence
+
+The application currently uses localStorage for data persistence, making it perfect for:
+- Personal use
+- Offline functionality
+- Quick prototyping
+- Easy migration to backend APIs
+
+### Future Backend Integration
+The service architecture is designed to easily swap localStorage with:
+- REST APIs
+- GraphQL endpoints
+- Real-time databases
+- Cloud storage solutions
+
+## 🧪 Testing
 
 ```bash
-ng generate component component-name
+# Run unit tests
+npm test
+
+# Run e2e tests
+npm run e2e
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## 📦 Build & Deployment
 
+### Development
 ```bash
-ng generate --help
+npm start
 ```
 
-## Building
-
-To build the project run:
-
+### Production Build
 ```bash
-ng build
+npm run build
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
+### Watch Mode
 ```bash
-ng test
+npm run watch
 ```
 
-## Running end-to-end tests
+## 🤝 Contributing
 
-For end-to-end (e2e) testing, run:
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-```bash
-ng e2e
-```
+## 📄 License
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Additional Resources
+## 🙏 Acknowledgments
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+- **Angular Team** for the amazing framework
+- **PrimeNG Team** for the excellent UI components
+- **Tailwind CSS Team** for the utility-first CSS framework
+- **Open Source Community** for inspiration and support
+
+## 📞 Support
+
+If you have any questions or need help:
+- Create an issue in the repository
+- Check the documentation
+- Review the code examples
+
+---
+
+**Happy Tasking! 🎉**

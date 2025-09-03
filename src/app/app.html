@@ -1,1 +1,39 @@
-<router-outlet />
+<div class="min-h-screen bg-gray-50">
+  <!-- Navigation -->
+  <p-menubar class="shadow-sm border-b border-gray-200">
+    <ng-template pTemplate="start">
+      <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-2">
+          <i class="pi pi-check-circle text-2xl text-blue-600"></i>
+          <span class="text-xl font-bold text-gray-900">{{ title }}</span>
+        </div>
+      </div>
+    </ng-template>
+    
+    <ng-template pTemplate="end">
+      <div class="flex items-center space-x-4">
+        <button 
+          pButton 
+          label="Tasks" 
+          icon="pi pi-list"
+          routerLink="/"
+          routerLinkActive="p-button-outlined"
+          class="p-button-text"
+        ></button>
+        <button 
+          pButton 
+          label="Projects" 
+          icon="pi pi-folder"
+          routerLink="/projects"
+          routerLinkActive="p-button-outlined"
+          class="p-button-text"
+        ></button>
+      </div>
+    </ng-template>
+  </p-menubar>
+
+  <!-- Main Content -->
+  <main class="min-h-screen">
+    <router-outlet></router-outlet>
+  </main>
+</div>

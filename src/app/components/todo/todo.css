@@ -1,0 +1,283 @@
+/* Custom styles for the todo component */
+
+/* Task card hover effects */
+.task-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Animation for task completion */
+.task-completed {
+  transition: all 0.3s ease-in-out;
+}
+
+.task-completed.completed {
+  opacity: 0.75;
+  transform: scale(0.98);
+}
+
+/* Custom focus styles for form inputs */
+.form-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .filters-sidebar {
+    order: 2;
+  }
+  
+  .task-content {
+    order: 1;
+  }
+}
+
+/* Loading states */
+.loading {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.loading .skeleton {
+  background-color: #e5e7eb;
+  border-radius: 0.25rem;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Empty state styling */
+.empty-state {
+  text-align: center;
+  padding: 4rem 0;
+}
+
+.empty-state-icon {
+  color: #d1d5db;
+  font-size: 6rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state-description {
+  color: #6b7280;
+}
+
+/* Task priority indicators */
+.priority-indicator {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  display: inline-block;
+  margin-right: 0.5rem;
+}
+
+.priority-indicator.low {
+  background-color: #10b981;
+}
+
+.priority-indicator.medium {
+  background-color: #f59e0b;
+}
+
+.priority-indicator.high {
+  background-color: #ef4444;
+}
+
+/* Due date styling */
+.due-date {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.due-date.overdue {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.due-date.today {
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.due-date.future {
+  color: #4b5563;
+}
+
+/* Project tag styling */
+.project-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 640px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  
+  .stats-grid .stat-card {
+    padding: 0.75rem;
+  }
+  
+  .stats-grid .stat-number {
+    font-size: 1.25rem;
+  }
+  
+  .stats-grid .stat-label {
+    font-size: 0.75rem;
+  }
+}
+
+/* Custom animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Task item animations */
+.task-item {
+  animation: slideIn 0.3s ease-out;
+}
+
+.task-item:nth-child(1) { animation-delay: 0.1s; }
+.task-item:nth-child(2) { animation-delay: 0.2s; }
+.task-item:nth-child(3) { animation-delay: 0.3s; }
+.task-item:nth-child(4) { animation-delay: 0.4s; }
+.task-item:nth-child(5) { animation-delay: 0.5s; }
+
+/* Focus management for accessibility */
+.focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #3b82f6, 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+/* Button states */
+.btn-primary {
+  background-color: #2563eb;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #1d4ed8;
+}
+
+.btn-primary:focus {
+  background-color: #1d4ed8;
+}
+
+.btn-primary:active {
+  background-color: #1e40af;
+}
+
+.btn-secondary {
+  background-color: #4b5563;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: #374151;
+}
+
+.btn-secondary:focus {
+  background-color: #374151;
+}
+
+.btn-secondary:active {
+  background-color: #1f2937;
+}
+
+.btn-danger {
+  background-color: #dc2626;
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #b91c1c;
+}
+
+.btn-danger:focus {
+  background-color: #b91c1c;
+}
+
+.btn-danger:active {
+  background-color: #991b1b;
+}
+
+/* Form validation styles */
+.form-error {
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.form-success {
+  color: #059669;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* Loading spinner */
+.spinner {
+  animation: spin 1s linear infinite;
+  border-radius: 9999px;
+  border: 2px solid #d1d5db;
+  border-top-color: #2563eb;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+/* Toast positioning */
+.p-toast {
+  z-index: 50;
+}
+
+/* Dialog backdrop */
+.p-dialog-mask {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Responsive dialog */
+@media (max-width: 640px) {
+  .p-dialog {
+    margin: 0 1rem;
+  }
+}

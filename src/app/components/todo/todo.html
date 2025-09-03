@@ -1,0 +1,317 @@
+<div class="min-h-screen bg-gray-50 p-4">
+  <!-- Header -->
+  <div class="max-w-7xl mx-auto mb-8">
+    <div class="text-center">
+      <h1 class="text-4xl font-bold text-gray-900 mb-2">xTodo</h1>
+      <p class="text-gray-600">Organize your tasks, achieve your goals</p>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="max-w-7xl mx-auto mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <p-card class="text-center">
+        <div class="p-4">
+          <div class="text-2xl font-bold text-blue-600">{{ statistics.total || 0 }}</div>
+          <div class="text-sm text-gray-600">Total Tasks</div>
+        </div>
+      </p-card>
+      
+      <p-card class="text-center">
+        <div class="p-4">
+          <div class="text-2xl font-bold text-green-600">{{ statistics.active || 0 }}</div>
+          <div class="text-sm text-gray-600">Active</div>
+        </div>
+      </p-card>
+      
+      <p-card class="text-center">
+        <div class="p-4">
+          <div class="text-2xl font-bold text-purple-600">{{ statistics.completed || 0 }}</div>
+          <div class="text-sm text-gray-600">Completed</div>
+        </div>
+      </p-card>
+      
+      <p-card class="text-center">
+        <div class="p-4">
+          <div class="text-2xl font-bold text-orange-600">{{ statistics.dueToday || 0 }}</div>
+          <div class="text-sm text-gray-600">Due Today</div>
+        </div>
+      </p-card>
+      
+      <p-card class="text-center">
+        <div class="p-4">
+          <div class="text-2xl font-bold text-red-600">{{ statistics.overdue || 0 }}</div>
+          <div class="text-sm text-gray-600">Overdue</div>
+        </div>
+      </p-card>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="max-w-7xl mx-auto">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      
+      <!-- Left Sidebar - Filters -->
+      <div class="lg:col-span-1">
+        <p-card header="Filters" class="h-fit">
+          <!-- Search -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Search</label>
+            <input 
+              pInputText 
+              type="text" 
+              placeholder="Search tasks..."
+              [(ngModel)]="filters.search"
+              (input)="applyFilters()"
+              class="w-full"
+            />
+          </div>
+
+          <!-- View Toggle -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">View</label>
+            <div class="flex flex-col space-y-2">
+              <button 
+                *ngFor="let view of viewOptions"
+                (click)="setView(view)"
+                [class]="'text-left px-3 py-2 rounded-lg transition-colors ' + 
+                         (selectedView === view ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100')"
+              >
+                {{ view | titlecase }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Priority Filter -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+            <select 
+              [(ngModel)]="filters.priority"
+              (change)="applyFilters()"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option [value]="null">All Priorities</option>
+              <option *ngFor="let priority of priorityOptions" [value]="priority.value">
+                {{ priority.label }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Project Filter -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Project</label>
+            <select 
+              [(ngModel)]="filters.projectId"
+              (change)="applyFilters()"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option [value]="null">All Projects</option>
+              <option *ngFor="let project of projects" [value]="project.id">
+                {{ project.name }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Add Task Button -->
+          <button 
+            pButton 
+            label="Add Task" 
+            icon="pi pi-plus"
+            (click)="showAddDialog = true"
+            class="w-full"
+          ></button>
+        </p-card>
+      </div>
+
+      <!-- Right Content - Task List -->
+      <div class="lg:col-span-3">
+        <p-card header="Tasks" class="min-h-[600px]">
+          <!-- Task List -->
+          <div *ngIf="filteredTasks.length === 0" class="text-center py-12">
+            <div class="text-gray-400 mb-4">
+              <i class="pi pi-inbox text-6xl"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
+            <p class="text-gray-600">Create your first task to get started!</p>
+          </div>
+
+          <div *ngFor="let task of filteredTasks" class="mb-4 last:mb-0">
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+              <div class="flex items-start space-x-3">
+                <!-- Checkbox -->
+                <p-checkbox 
+                  [binary]="true"
+                  [ngModel]="task.completed"
+                  (onChange)="toggleTaskCompletion(task)"
+                  class="mt-1"
+                ></p-checkbox>
+
+                <!-- Task Content -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <h3 
+                        [class]="'text-lg font-medium ' + (task.completed ? 'line-through text-gray-500' : 'text-gray-900')"
+                      >
+                        {{ task.title }}
+                      </h3>
+                      
+                      <p 
+                        *ngIf="task.description"
+                        [class]="'text-sm mt-1 ' + (task.completed ? 'text-gray-400' : 'text-gray-600')"
+                      >
+                        {{ task.description }}
+                      </p>
+
+                      <!-- Task Meta -->
+                      <div class="flex flex-wrap items-center gap-2 mt-3">
+                        <!-- Priority -->
+                        <span 
+                          [class]="'px-2 py-1 text-xs font-medium rounded-full ' + getPriorityColor(task.priority)"
+                        >
+                          {{ task.priority }}
+                        </span>
+
+                        <!-- Project -->
+                        <span 
+                          *ngIf="task.projectId"
+                          [class]="'px-2 py-1 text-xs font-medium rounded-full ' + getProjectColor(task.projectId)"
+                        >
+                          {{ getProjectName(task.projectId) }}
+                        </span>
+
+                        <!-- Due Date -->
+                        <span 
+                          *ngIf="task.dueDate"
+                          [class]="'px-2 py-1 text-xs font-medium rounded-full ' + 
+                                   (isOverdue(task) ? 'bg-red-100 text-red-800' : 
+                                    isDueToday(task) ? 'bg-blue-100 text-blue-800' : 
+                                    'bg-gray-100 text-gray-600')"
+                        >
+                          <i class="pi pi-calendar mr-1"></i>
+                          {{ task.dueDate | date:'shortDate' }}
+                          <span *ngIf="isOverdue(task)" class="ml-1">(Overdue)</span>
+                          <span *ngIf="isDueToday(task)" class="ml-1">(Today)</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex items-center space-x-2 ml-4">
+                      <button 
+                        pButton 
+                        icon="pi pi-trash" 
+                        severity="danger"
+                        size="small"
+                        (click)="deleteTask(task)"
+                        pTooltip="Delete task"
+                        class="p-button-text"
+                      ></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </p-card>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Task Dialog -->
+  <p-dialog 
+    header="Add New Task" 
+    [(visible)]="showAddDialog" 
+    [modal]="true" 
+    [style]="{width: '500px'}"
+    [draggable]="false"
+    [resizable]="false"
+  >
+    <div class="space-y-4">
+      <!-- Title -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Title *</label>
+        <input 
+          pInputText 
+          type="text" 
+          placeholder="Enter task title..."
+          [(ngModel)]="newTask.title"
+          class="w-full"
+        />
+      </div>
+
+      <!-- Description -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+        <textarea 
+          pTextarea 
+          placeholder="Enter task description..."
+          [(ngModel)]="newTask.description"
+          [rows]="3"
+          class="w-full"
+        ></textarea>
+      </div>
+
+      <!-- Priority -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+        <select 
+          [(ngModel)]="newTask.priority"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option *ngFor="let priority of priorityOptions" [value]="priority.value">
+            {{ priority.label }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Due Date -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+        <input 
+          type="date"
+          [(ngModel)]="newTask.dueDate"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+      </div>
+
+      <!-- Project -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Project</label>
+        <select 
+          [(ngModel)]="newTask.projectId"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option [value]="null">No Project</option>
+          <option *ngFor="let project of projects" [value]="project.id">
+            {{ project.name }}
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <ng-template pTemplate="footer">
+      <div class="flex justify-end space-x-2">
+        <button 
+          pButton 
+          label="Cancel" 
+          severity="secondary"
+          (click)="showAddDialog = false"
+          class="p-button-text"
+        ></button>
+        <button 
+          pButton 
+          label="Add Task" 
+          icon="pi pi-check"
+          (click)="addTask()"
+        ></button>
+      </div>
+    </ng-template>
+  </p-dialog>
+
+  <!-- Toast Messages -->
+  <p-toast></p-toast>
+
+  <!-- Confirmation Dialog -->
+  <p-confirmDialog></p-confirmDialog>
+</div>
