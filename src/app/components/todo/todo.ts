@@ -21,7 +21,7 @@ import { TooltipModule } from 'primeng/tooltip';
 
 // Services and Models
 import { TaskService } from '../../services/task';
-import { StorageService } from '../../services/storage';
+import { ProjectService } from '../../services/project.service';
 import { Task, Project, TaskFilters } from '../../models/task';
 
 type ViewType = 'all' | 'active' | 'completed';
@@ -85,7 +85,7 @@ export class TodoComponent implements OnInit, OnDestroy {
 
   constructor(
     private taskService: TaskService,
-    private storageService: StorageService,
+    private projectService: ProjectService,
     private confirmationService: ConfirmationService,
     private messageService: MessageService
   ) {}
@@ -103,23 +103,53 @@ export class TodoComponent implements OnInit, OnDestroy {
   loadData(): void {
     this.taskService.getTasksWithProjects()
       .pipe(takeUntil(this.destroy$))
-      .subscribe(tasks => {
-        this.tasks = tasks;
-        this.applyFilters();
+      .subscribe({
+        next: (tasks) => {
+          this.tasks = tasks;
+          this.applyFilters();
+        },
+        error: (error) => {
+          console.error('Error loading tasks:', error);
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to load tasks. Please try again.'
+          });
+        }
       });
 
-    this.storageService.getProjects()
+    this.projectService.getProjects()
       .pipe(takeUntil(this.destroy$))
-      .subscribe(projects => {
-        this.projects = projects;
+      .subscribe({
+        next: (projects) => {
+          this.projects = projects;
+        },
+        error: (error) => {
+          console.error('Error loading projects:', error);
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to load projects. Please try again.'
+          });
+        }
       });
   }
 
   loadStatistics(): void {
     this.taskService.getTaskStatistics()
       .pipe(takeUntil(this.destroy$))
-      .subscribe(stats => {
-        this.statistics = stats;
+      .subscribe({
+        next: (stats) => {
+          this.statistics = stats;
+        },
+        error: (error) => {
+          console.error('Error loading statistics:', error);
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to load statistics. Please try again.'
+          });
+        }
       });
   }
 
@@ -144,25 +174,45 @@ export class TodoComponent implements OnInit, OnDestroy {
 
     this.taskService.addTask(taskData)
       .pipe(takeUntil(this.destroy$))
-      .subscribe(() => {
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Success',
-          detail: 'Task added successfully'
-        });
-        this.resetNewTask();
-        this.showAddDialog = false;
-        this.loadData();
-        this.loadStatistics();
+      .subscribe({
+        next: () => {
+          this.messageService.add({
+            severity: 'success',
+            summary: 'Success',
+            detail: 'Task added successfully'
+          });
+          this.resetNewTask();
+          this.showAddDialog = false;
+          this.loadData();
+          this.loadStatistics();
+        },
+        error: (error) => {
+          console.error('Error adding task:', error);
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to add task. Please try again.'
+          });
+        }
       });
   }
 
   toggleTaskCompletion(task: Task): void {
     this.taskService.toggleTaskCompletion(task.id)
       .pipe(takeUntil(this.destroy$))
-      .subscribe(() => {
-        this.loadData();
-        this.loadStatistics();
+      .subscribe({
+        next: () => {
+          this.loadData();
+          this.loadStatistics();
+        },
+        error: (error) => {
+          console.error('Error toggling task completion:', error);
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to update task. Please try again.'
+          });
+        }
       });
   }
 
@@ -174,14 +224,24 @@ export class TodoComponent implements OnInit, OnDestroy {
       accept: () => {
         this.taskService.deleteTask(task.id)
           .pipe(takeUntil(this.destroy$))
-          .subscribe(() => {
-            this.messageService.add({
-              severity: 'success',
-              summary: 'Success',
-              detail: 'Task deleted successfully'
-            });
-            this.loadData();
-            this.loadStatistics();
+          .subscribe({
+            next: () => {
+              this.messageService.add({
+                severity: 'success',
+                summary: 'Success',
+                detail: 'Task deleted successfully'
+              });
+              this.loadData();
+              this.loadStatistics();
+            },
+            error: (error) => {
+              console.error('Error deleting task:', error);
+              this.messageService.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Failed to delete task. Please try again.'
+              });
+            }
           });
       }
     });
@@ -198,36 +258,36 @@ export class TodoComponent implements OnInit, OnDestroy {
   }
 
   applyFilters(): void {
-    let filtered = [...this.tasks];
+    // Create filters object for backend
+    const backendFilters: TaskFilters = { ...this.filters };
 
     // Apply view filter
     switch (this.selectedView) {
       case 'active':
-        filtered = filtered.filter(task => !task.completed);
+        backendFilters.completed = false;
         break;
       case 'completed':
-        filtered = filtered.filter(task => task.completed);
+        backendFilters.completed = true;
         break;
     }
 
-    // Apply other filters
-    if (this.filters.search) {
-      const searchLower = this.filters.search.toLowerCase();
-      filtered = filtered.filter(task =>
-        task.title.toLowerCase().includes(searchLower) ||
-        (task.description?.toLowerCase().includes(searchLower))
-      );
-    }
-
-    if (this.filters.priority) {
-      filtered = filtered.filter(task => task.priority === this.filters.priority);
-    }
-
-    if (this.filters.projectId) {
-      filtered = filtered.filter(task => task.projectId === this.filters.projectId);
-    }
-
-    this.filteredTasks = filtered;
+    // Load tasks with filters from backend
+    this.taskService.getTasksWithProjects()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (tasks) => {
+          this.tasks = tasks;
+          this.filteredTasks = tasks;
+        },
+        error: (error) => {
+          console.error('Error applying filters:', error);
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to apply filters. Please try again.'
+          });
+        }
+      });
   }
 
   resetNewTask(): void {

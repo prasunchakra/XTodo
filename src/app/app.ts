@@ -20,7 +20,7 @@ import { BadgeModule } from 'primeng/badge';
   styleUrl: './app.css'
 })
 export class App {
-  title = 'xTodo';
+  title = signal('xTodo');
   
   menuItems = [
     {

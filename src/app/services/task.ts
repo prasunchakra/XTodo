@@ -1,134 +1,72 @@
 import { Injectable } from '@angular/core';
 import { Observable, combineLatest, map, switchMap, of } from 'rxjs';
-import { StorageService } from './storage';
+import { ApiService } from './api.service';
 import { Task, Project, TaskFilters } from '../models/task';
 
 @Injectable({
   providedIn: 'root'
 })
 export class TaskService {
-  constructor(private storageService: StorageService) {}
+  constructor(private apiService: ApiService) {}
 
   // Get all tasks with optional filtering
   getTasks(filters?: TaskFilters): Observable<Task[]> {
-    return this.storageService.getTasks().pipe(
-      map(tasks => this.applyFilters(tasks, filters))
-    );
+    return this.apiService.getTasks(filters);
   }
 
   // Get tasks grouped by project
   getTasksByProject(): Observable<{ [projectId: string]: Task[] }> {
-    return this.storageService.getTasks().pipe(
-      map(tasks => {
-        const grouped: { [projectId: string]: Task[] } = {};
-        tasks.forEach(task => {
-          const projectId = task.projectId || 'unassigned';
-          if (!grouped[projectId]) {
-            grouped[projectId] = [];
-          }
-          grouped[projectId].push(task);
-        });
-        return grouped;
-      })
-    );
+    return this.apiService.getTasksGroupedByProject();
   }
 
   // Get tasks with project information
   getTasksWithProjects(): Observable<(Task & { project?: Project })[]> {
-    return combineLatest([
-      this.storageService.getTasks(),
-      this.storageService.getProjects()
-    ]).pipe(
-      map(([tasks, projects]) => {
-        return tasks.map(task => ({
-          ...task,
-          project: projects.find(p => p.id === task.projectId)
-        }));
-      })
-    );
+    return this.apiService.getTasksWithProjects();
   }
 
   // Get tasks due today
   getTasksDueToday(): Observable<Task[]> {
-    return this.storageService.getTasks().pipe(
-      map(tasks => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        
-        return tasks.filter(task => 
-          task.dueDate && 
-          !task.completed &&
-          task.dueDate >= today && 
-          task.dueDate < tomorrow
-        );
-      })
-    );
+    return this.apiService.getTasksDueToday();
   }
 
   // Get overdue tasks
   getOverdueTasks(): Observable<Task[]> {
-    return this.storageService.getTasks().pipe(
-      map(tasks => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        return tasks.filter(task => 
-          task.dueDate && 
-          !task.completed &&
-          task.dueDate < today
-        );
-      })
-    );
+    return this.apiService.getOverdueTasks();
   }
 
   // Get tasks by priority
   getTasksByPriority(priority: Task['priority']): Observable<Task[]> {
-    return this.storageService.getTasks().pipe(
-      map(tasks => tasks.filter(task => task.priority === priority))
-    );
+    return this.apiService.getTasksByPriority(priority);
   }
 
   // Get completed tasks
   getCompletedTasks(): Observable<Task[]> {
-    return this.storageService.getTasks().pipe(
-      map(tasks => tasks.filter(task => task.completed))
-    );
+    return this.apiService.getCompletedTasks();
   }
 
   // Get active tasks (not completed)
   getActiveTasks(): Observable<Task[]> {
-    return this.storageService.getTasks().pipe(
-      map(tasks => tasks.filter(task => !task.completed))
-    );
+    return this.apiService.getActiveTasks();
   }
 
   // Add a new task
   addTask(taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Observable<Task> {
-    return this.storageService.addTask(taskData);
+    return this.apiService.createTask(taskData);
   }
 
   // Update a task
-  updateTask(id: string, updates: Partial<Omit<Task, 'id' | 'createdAt'>>): Observable<Task | undefined> {
-    return this.storageService.updateTask(id, updates);
+  updateTask(id: string, updates: Partial<Omit<Task, 'id' | 'createdAt'>>): Observable<Task> {
+    return this.apiService.updateTask(id, updates);
   }
 
   // Toggle task completion
-  toggleTaskCompletion(id: string): Observable<Task | undefined> {
-    return this.storageService.getTaskById(id).pipe(
-      switchMap(task => {
-        if (task) {
-          return this.storageService.updateTask(id, { completed: !task.completed });
-        }
-        return of(undefined);
-      })
-    );
+  toggleTaskCompletion(id: string): Observable<Task> {
+    return this.apiService.toggleTaskCompletion(id);
   }
 
   // Delete a task
-  deleteTask(id: string): Observable<boolean> {
-    return this.storageService.deleteTask(id);
+  deleteTask(id: string): Observable<void> {
+    return this.apiService.deleteTask(id);
   }
 
   // Get task statistics
@@ -139,66 +77,7 @@ export class TaskService {
     overdue: number;
     dueToday: number;
   }> {
-    return combineLatest([
-      this.storageService.getTasks(),
-      this.getOverdueTasks(),
-      this.getTasksDueToday()
-    ]).pipe(
-      map(([allTasks, overdueTasks, dueTodayTasks]) => ({
-        total: allTasks.length,
-        completed: allTasks.filter(t => t.completed).length,
-        active: allTasks.filter(t => !t.completed).length,
-        overdue: overdueTasks.length,
-        dueToday: dueTodayTasks.length
-      }))
-    );
+    return this.apiService.getTaskStatistics();
   }
 
-  // Private helper methods
-  private applyFilters(tasks: Task[], filters?: TaskFilters): Task[] {
-    if (!filters) return tasks;
-
-    return tasks.filter(task => {
-      // Search filter
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        if (!task.title.toLowerCase().includes(searchLower) &&
-            !(task.description?.toLowerCase().includes(searchLower))) {
-          return false;
-        }
-      }
-
-      // Priority filter
-      if (filters.priority && task.priority !== filters.priority) {
-        return false;
-      }
-
-      // Project filter
-      if (filters.projectId && task.projectId !== filters.projectId) {
-        return false;
-      }
-
-      // Due date filter
-      if (filters.dueDate) {
-        const filterDate = new Date(filters.dueDate);
-        filterDate.setHours(0, 0, 0, 0);
-        if (task.dueDate) {
-          const taskDate = new Date(task.dueDate);
-          taskDate.setHours(0, 0, 0, 0);
-          if (taskDate.getTime() !== filterDate.getTime()) {
-            return false;
-          }
-        } else {
-          return false;
-        }
-      }
-
-      // Completion filter
-      if (filters.completed !== undefined && task.completed !== filters.completed) {
-        return false;
-      }
-
-      return true;
-    });
-  }
 }

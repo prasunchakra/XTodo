@@ -18,7 +18,7 @@ import { BadgeModule } from 'primeng/badge';
 import { TooltipModule } from 'primeng/tooltip';
 
 // Services and Models
-import { StorageService } from '../../services/storage';
+import { ProjectService } from '../../services/project.service';
 import { TaskService } from '../../services/task';
 import { Project, Task } from '../../models/task';
 
@@ -70,7 +70,7 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   constructor(
-    private storageService: StorageService,
+    private projectService: ProjectService,
     private taskService: TaskService,
     private confirmationService: ConfirmationService,
     private messageService: MessageService
@@ -86,16 +86,36 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
   }
 
   loadData(): void {
-    this.storageService.getProjects()
+    this.projectService.getProjects()
       .pipe(takeUntil(this.destroy$))
-      .subscribe(projects => {
-        this.projects = projects;
+      .subscribe({
+        next: (projects) => {
+          this.projects = projects;
+        },
+        error: (error) => {
+          console.error('Error loading projects:', error);
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to load projects. Please try again.'
+          });
+        }
       });
 
     this.taskService.getTasksByProject()
       .pipe(takeUntil(this.destroy$))
-      .subscribe(tasksByProject => {
-        this.tasksByProject = tasksByProject;
+      .subscribe({
+        next: (tasksByProject) => {
+          this.tasksByProject = tasksByProject;
+        },
+        error: (error) => {
+          console.error('Error loading tasks by project:', error);
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to load task data. Please try again.'
+          });
+        }
       });
   }
 
@@ -115,17 +135,27 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
       color: this.newProject.color || '#3B82F6'
     };
 
-    this.storageService.addProject(projectData)
+    this.projectService.addProject(projectData)
       .pipe(takeUntil(this.destroy$))
-      .subscribe(() => {
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Success',
-          detail: 'Project created successfully'
-        });
-        this.resetNewProject();
-        this.showAddDialog = false;
-        this.loadData();
+      .subscribe({
+        next: () => {
+          this.messageService.add({
+            severity: 'success',
+            summary: 'Success',
+            detail: 'Project created successfully'
+          });
+          this.resetNewProject();
+          this.showAddDialog = false;
+          this.loadData();
+        },
+        error: (error) => {
+          console.error('Error creating project:', error);
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to create project. Please try again.'
+          });
+        }
       });
   }
 
@@ -145,17 +175,27 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
       color: this.editingProject.color
     };
 
-    this.storageService.updateProject(this.editingProject.id, updates)
+    this.projectService.updateProject(this.editingProject.id, updates)
       .pipe(takeUntil(this.destroy$))
-      .subscribe(() => {
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Success',
-          detail: 'Project updated successfully'
-        });
-        this.editingProject = null;
-        this.showEditDialog = false;
-        this.loadData();
+      .subscribe({
+        next: () => {
+          this.messageService.add({
+            severity: 'success',
+            summary: 'Success',
+            detail: 'Project updated successfully'
+          });
+          this.editingProject = null;
+          this.showEditDialog = false;
+          this.loadData();
+        },
+        error: (error) => {
+          console.error('Error updating project:', error);
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to update project. Please try again.'
+          });
+        }
       });
   }
 
@@ -170,15 +210,25 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
       header: 'Delete Project Confirmation',
       icon: 'pi pi-exclamation-triangle',
       accept: () => {
-        this.storageService.deleteProject(project.id)
+        this.projectService.deleteProject(project.id)
           .pipe(takeUntil(this.destroy$))
-          .subscribe(() => {
-            this.messageService.add({
-              severity: 'success',
-              summary: 'Success',
-              detail: 'Project deleted successfully'
-            });
-            this.loadData();
+          .subscribe({
+            next: () => {
+              this.messageService.add({
+                severity: 'success',
+                summary: 'Success',
+                detail: 'Project deleted successfully'
+              });
+              this.loadData();
+            },
+            error: (error) => {
+              console.error('Error deleting project:', error);
+              this.messageService.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Failed to delete project. Please try again.'
+              });
+            }
           });
       }
     });
