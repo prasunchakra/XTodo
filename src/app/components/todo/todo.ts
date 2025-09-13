@@ -22,6 +22,7 @@ import { TooltipModule } from 'primeng/tooltip';
 // Services and Models
 import { TaskService } from '../../services/task';
 import { ProjectService } from '../../services/project.service';
+import { SyncService } from '../../services/sync.service';
 import { Task, Project, TaskFilters } from '../../models/task';
 
 type ViewType = 'all' | 'active' | 'completed';
@@ -55,6 +56,8 @@ export class TodoComponent implements OnInit, OnDestroy {
   projects: Project[] = [];
   filteredTasks: Task[] = [];
   statistics: any = {};
+  isSyncing = false;
+  pendingChanges = 0;
   
   // Form data
   newTask: Partial<Task> = {
@@ -86,6 +89,7 @@ export class TodoComponent implements OnInit, OnDestroy {
   constructor(
     private taskService: TaskService,
     private projectService: ProjectService,
+    private syncService: SyncService,
     private confirmationService: ConfirmationService,
     private messageService: MessageService
   ) {}
@@ -93,6 +97,7 @@ export class TodoComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadData();
     this.loadStatistics();
+    this.subscribeToPendingChanges();
   }
 
   ngOnDestroy(): void {
@@ -331,5 +336,63 @@ export class TodoComponent implements OnInit, OnDestroy {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     return task.dueDate >= today && task.dueDate < tomorrow;
+  }
+
+  // Sync methods
+  syncWithServer(): void {
+    if (this.isSyncing) return;
+    
+    this.isSyncing = true;
+    this.syncService.syncWithServer()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          this.messageService.add({
+            severity: 'success',
+            summary: 'Sync Complete',
+            detail: 'Data synchronized successfully'
+          });
+          this.isSyncing = false;
+        },
+        error: (error) => {
+          console.error('Sync failed:', error);
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Sync Failed',
+            detail: 'Failed to sync with server. Changes are saved locally.'
+          });
+          this.isSyncing = false;
+        }
+      });
+  }
+
+  initializeDatabase(): void {
+    this.syncService.initializeDatabase()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          this.messageService.add({
+            severity: 'success',
+            summary: 'Database Initialized',
+            detail: 'Database tables created successfully'
+          });
+        },
+        error: (error) => {
+          console.error('Database initialization failed:', error);
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Database Error',
+            detail: 'Failed to initialize database'
+          });
+        }
+      });
+  }
+
+  private subscribeToPendingChanges(): void {
+    this.syncService.pendingChanges$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(changes => {
+        this.pendingChanges = changes.length;
+      });
   }
 }

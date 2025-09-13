@@ -6,7 +6,11 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "netlify": "netlify",
+    "dev": "netlify dev",
+    "deploy": "netlify deploy --prod",
+    "test-setup": "node test-setup.js"
   },
   "prettier": {
     "printWidth": 100,
@@ -28,8 +32,11 @@
     "@angular/forms": "^20.2.0",
     "@angular/platform-browser": "^20.2.0",
     "@angular/router": "^20.2.0",
+    "@neondatabase/serverless": "^1.0.1",
     "@primeuix/themes": "^1.2.3",
     "@tailwindcss/postcss": "^4.1.12",
+    "netlify-cli": "^23.6.0",
+    "pg": "^8.16.3",
     "postcss": "^8.5.6",
     "primeng": "^20.0.1",
     "rxjs": "~7.8.0",

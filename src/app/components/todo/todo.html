@@ -50,6 +50,34 @@
     </div>
   </div>
 
+  <!-- Sync Controls -->
+  <div class="max-w-7xl mx-auto mb-6">
+    <div class="flex justify-center space-x-4">
+      <button 
+        pButton 
+        label="Sync with Server" 
+        icon="pi pi-refresh"
+        [loading]="isSyncing"
+        (click)="syncWithServer()"
+        class="p-button-success"
+        [disabled]="isSyncing"
+      ></button>
+      
+      <button 
+        pButton 
+        label="Initialize DB" 
+        icon="pi pi-database"
+        (click)="initializeDatabase()"
+        class="p-button-info"
+      ></button>
+      
+      <div *ngIf="pendingChanges > 0" class="flex items-center text-orange-600">
+        <i class="pi pi-exclamation-triangle mr-2"></i>
+        <span>{{ pendingChanges }} pending changes</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Main Content -->
   <div class="max-w-7xl mx-auto">
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">

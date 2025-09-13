@@ -1,36 +1,54 @@
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
-import { ApiService } from './api.service';
+import { Observable, of, throwError } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { SyncService } from './sync.service';
 import { Project } from '../models/task';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ProjectService {
-  constructor(private apiService: ApiService) {}
+  constructor(private syncService: SyncService) {}
 
   // Get all projects
   getProjects(): Observable<Project[]> {
-    return this.apiService.getProjects();
+    return this.syncService.projects$;
   }
 
   // Get a specific project by ID
   getProjectById(id: string): Observable<Project> {
-    return this.apiService.getProjectById(id);
+    return this.syncService.projects$.pipe(
+      map(projects => {
+        const project = projects.find(p => p.id === id);
+        if (!project) {
+          throw new Error('Project not found');
+        }
+        return project;
+      })
+    );
   }
 
   // Create a new project
   addProject(projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Observable<Project> {
-    return this.apiService.createProject(projectData);
+    const newProject = this.syncService.addProject(projectData);
+    return of(newProject);
   }
 
   // Update an existing project
   updateProject(id: string, updates: Partial<Omit<Project, 'id' | 'createdAt'>>): Observable<Project> {
-    return this.apiService.updateProject(id, updates);
+    const updatedProject = this.syncService.updateProject(id, updates);
+    if (!updatedProject) {
+      return throwError(() => new Error('Project not found'));
+    }
+    return of(updatedProject);
   }
 
   // Delete a project
   deleteProject(id: string): Observable<void> {
-    return this.apiService.deleteProject(id);
+    const success = this.syncService.deleteProject(id);
+    if (!success) {
+      return throwError(() => new Error('Project not found'));
+    }
+    return of(undefined);
   }
 }
