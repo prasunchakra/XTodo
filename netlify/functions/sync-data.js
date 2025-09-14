@@ -1,7 +1,6 @@
-const { neon } = require('@neondatabase/serverless');
+import { neon } from '@netlify/neon';
 
-// Initialize Neon connection
-const sql = neon(process.env.DATABASE_URL);
+const sql = neon();
 
 exports.handler = async (event, context) => {
   // Enable CORS
@@ -12,7 +11,6 @@ exports.handler = async (event, context) => {
     'Content-Type': 'application/json'
   };
 
-  // Handle preflight requests
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
@@ -23,7 +21,6 @@ exports.handler = async (event, context) => {
 
     switch (method) {
       case 'GET':
-        // Get all data (tasks and projects) in one call
         const [tasks, projects] = await Promise.all([
           sql`SELECT * FROM tasks ORDER BY created_at DESC`,
           sql`SELECT * FROM projects ORDER BY created_at DESC`
@@ -48,16 +45,12 @@ exports.handler = async (event, context) => {
         };
 
       case 'POST':
-        // Bulk sync data from client
         const { tasks: clientTasks, projects: clientProjects, lastSync } = body;
 
-        // Get server data since last sync
         const serverData = await getServerDataSince(lastSync);
 
-        // Process client changes
         const clientChanges = await processClientChanges(clientTasks, clientProjects);
 
-        // Return server changes and confirmation of client changes
         return {
           statusCode: 200,
           headers,
@@ -87,7 +80,6 @@ exports.handler = async (event, context) => {
 
 async function getServerDataSince(lastSync) {
   if (!lastSync) {
-    // Return all data if no last sync
     const [tasks, projects] = await Promise.all([
       sql`SELECT * FROM tasks ORDER BY created_at DESC`,
       sql`SELECT * FROM projects ORDER BY created_at DESC`
@@ -108,7 +100,6 @@ async function getServerDataSince(lastSync) {
     };
   }
 
-  // Get only changes since last sync
   const [tasks, projects] = await Promise.all([
     sql`SELECT * FROM tasks WHERE updated_at > ${lastSync} ORDER BY created_at DESC`,
     sql`SELECT * FROM projects WHERE updated_at > ${lastSync} ORDER BY created_at DESC`
@@ -132,7 +123,7 @@ async function getServerDataSince(lastSync) {
 async function processClientChanges(clientTasks, clientProjects) {
   const results = { tasks: [], projects: [] };
 
-  // Process task changes
+  const task = change.data; 
   for (const task of clientTasks) {
     try {
       if (task._action === 'create') {
@@ -171,7 +162,6 @@ async function processClientChanges(clientTasks, clientProjects) {
     }
   }
 
-  // Process project changes
   for (const project of clientProjects) {
     try {
       if (project._action === 'create') {
