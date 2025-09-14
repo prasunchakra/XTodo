@@ -119,7 +119,7 @@ export class TaskService {
 
   // Toggle task completion
   toggleTaskCompletion(id: string): Observable<Task> {
-    const currentTasks = this.syncService.tasksSubject.value;
+    const currentTasks = this.syncService.getCurrentTasksSnapshot();
     const task = currentTasks.find(t => t.id === id);
     if (!task) {
       return throwError(() => new Error('Task not found'));

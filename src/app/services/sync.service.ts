@@ -45,6 +45,15 @@ export class SyncService {
     this.loadPendingChanges();
   }
 
+  // Synchronous snapshots for consumers that need immediate values
+  public getCurrentTasksSnapshot(): Task[] {
+    return this.tasksSubject.value;
+  }
+
+  public getCurrentProjectsSnapshot(): Project[] {
+    return this.projectsSubject.value;
+  }
+
   // Initialize database (call once)
   initializeDatabase(): Observable<any> {
     return this.http.post(`${environment.apiUrl}/init-db`, {});
