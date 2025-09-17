@@ -1,10 +1,8 @@
-const { neon } = require('@neondatabase/serverless');
+import { neon } from '@netlify/neon';
 
-// Initialize Neon connection
-const sql = neon(process.env.DATABASE_URL);
+const sql = neon();
 
 exports.handler = async (event, context) => {
-  // Enable CORS
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -12,7 +10,6 @@ exports.handler = async (event, context) => {
     'Content-Type': 'application/json'
   };
 
-  // Handle preflight requests
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
@@ -26,7 +23,6 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Create tables if they don't exist
     await sql`
       CREATE TABLE IF NOT EXISTS projects (
         id VARCHAR(255) PRIMARY KEY,
@@ -52,7 +48,6 @@ exports.handler = async (event, context) => {
       )
     `;
 
-    // Create indexes for better performance
     await sql`CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completed)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority)`;

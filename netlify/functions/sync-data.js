@@ -3,7 +3,6 @@ import { neon } from '@netlify/neon';
 const sql = neon();
 
 exports.handler = async (event, context) => {
-  // Enable CORS
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
