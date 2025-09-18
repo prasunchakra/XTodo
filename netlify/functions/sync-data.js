@@ -15,7 +15,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { method } = event;
+    const { httpMethod: method } = event;
     const body = event.body ? JSON.parse(event.body) : {};
 
     switch (method) {
@@ -122,13 +122,26 @@ async function getServerDataSince(lastSync) {
 async function processClientChanges(clientTasks, clientProjects) {
   const results = { tasks: [], projects: [] };
 
-  const task = change.data; 
-  for (const task of clientTasks) {
+  // Handle task changes (supports wrapped {type, action, data} or raw task objects)
+  for (const item of (clientTasks || [])) {
+    const wrapper = item && typeof item === 'object' && 'data' in item ? item : null;
+    const action = wrapper ? (wrapper.action || wrapper.data?._action) : item?._action;
+    const task = wrapper ? { ...wrapper.data, _action: action } : item;
     try {
       if (task._action === 'create') {
         const [newTask] = await sql`
           INSERT INTO tasks (id, title, description, completed, priority, due_date, project_id, created_at, updated_at)
-          VALUES (${task.id}, ${task.title}, ${task.description || null}, ${task.completed}, ${task.priority}, ${task.dueDate ? task.dueDate.toISOString() : null}, ${task.projectId || null}, ${task.createdAt.toISOString()}, ${task.updatedAt.toISOString()})
+          VALUES (
+            ${task.id},
+            ${task.title},
+            ${task.description || null},
+            ${Boolean(task.completed)},
+            ${task.priority},
+            ${task.dueDate ? new Date(task.dueDate).toISOString() : null},
+            ${task.projectId || null},
+            ${new Date(task.createdAt).toISOString()},
+            ${new Date(task.updatedAt).toISOString()}
+          )
           RETURNING *
         `;
         results.tasks.push({
@@ -140,9 +153,13 @@ async function processClientChanges(clientTasks, clientProjects) {
       } else if (task._action === 'update') {
         const [updatedTask] = await sql`
           UPDATE tasks 
-          SET title = ${task.title}, description = ${task.description || null}, completed = ${task.completed}, 
-              priority = ${task.priority}, due_date = ${task.dueDate ? task.dueDate.toISOString() : null}, 
-              project_id = ${task.projectId || null}, updated_at = ${task.updatedAt.toISOString()}
+          SET title = ${task.title},
+              description = ${task.description || null},
+              completed = ${Boolean(task.completed)}, 
+              priority = ${task.priority},
+              due_date = ${task.dueDate ? new Date(task.dueDate).toISOString() : null}, 
+              project_id = ${task.projectId || null},
+              updated_at = ${new Date(task.updatedAt).toISOString()}
           WHERE id = ${task.id}
           RETURNING *
         `;
@@ -161,12 +178,23 @@ async function processClientChanges(clientTasks, clientProjects) {
     }
   }
 
-  for (const project of clientProjects) {
+  // Handle project changes (supports wrapped {type, action, data} or raw project objects)
+  for (const item of (clientProjects || [])) {
+    const wrapper = item && typeof item === 'object' && 'data' in item ? item : null;
+    const action = wrapper ? (wrapper.action || wrapper.data?._action) : item?._action;
+    const project = wrapper ? { ...wrapper.data, _action: action } : item;
     try {
       if (project._action === 'create') {
         const [newProject] = await sql`
           INSERT INTO projects (id, name, description, color, created_at, updated_at)
-          VALUES (${project.id}, ${project.name}, ${project.description || null}, ${project.color}, ${project.createdAt.toISOString()}, ${project.updatedAt.toISOString()})
+          VALUES (
+            ${project.id},
+            ${project.name},
+            ${project.description || null},
+            ${project.color},
+            ${new Date(project.createdAt).toISOString()},
+            ${new Date(project.updatedAt).toISOString()}
+          )
           RETURNING *
         `;
         results.projects.push({
@@ -177,8 +205,10 @@ async function processClientChanges(clientTasks, clientProjects) {
       } else if (project._action === 'update') {
         const [updatedProject] = await sql`
           UPDATE projects 
-          SET name = ${project.name}, description = ${project.description || null}, 
-              color = ${project.color}, updated_at = ${project.updatedAt.toISOString()}
+          SET name = ${project.name},
+              description = ${project.description || null}, 
+              color = ${project.color},
+              updated_at = ${new Date(project.updatedAt).toISOString()}
           WHERE id = ${project.id}
           RETURNING *
         `;
