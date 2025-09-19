@@ -1,4 +1,5 @@
 import { neon } from '@netlify/neon';
+import jwt from 'jsonwebtoken';
 
 const sql = neon();
 
@@ -20,9 +21,15 @@ exports.handler = async (event, context) => {
 
     switch (method) {
       case 'GET':
+        // Require auth
+        const user = await authenticate(event.headers);
+        if (!user) {
+          return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
+        }
+
         const [tasks, projects] = await Promise.all([
-          sql`SELECT * FROM tasks ORDER BY created_at DESC`,
-          sql`SELECT * FROM projects ORDER BY created_at DESC`
+          sql`SELECT * FROM tasks WHERE user_id = ${user.id} ORDER BY created_at DESC`,
+          sql`SELECT * FROM projects WHERE user_id = ${user.id} ORDER BY created_at DESC`
         ]);
 
         return {
@@ -44,11 +51,15 @@ exports.handler = async (event, context) => {
         };
 
       case 'POST':
+        const authUser = await authenticate(event.headers);
+        if (!authUser) {
+          return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
+        }
         const { tasks: clientTasks, projects: clientProjects, lastSync } = body;
 
-        const serverData = await getServerDataSince(lastSync);
+        const serverData = await getServerDataSince(lastSync, authUser.id);
 
-        const clientChanges = await processClientChanges(clientTasks, clientProjects);
+        const clientChanges = await processClientChanges(clientTasks, clientProjects, authUser.id);
 
         return {
           statusCode: 200,
@@ -77,11 +88,11 @@ exports.handler = async (event, context) => {
   }
 };
 
-async function getServerDataSince(lastSync) {
+async function getServerDataSince(lastSync, userId) {
   if (!lastSync) {
     const [tasks, projects] = await Promise.all([
-      sql`SELECT * FROM tasks ORDER BY created_at DESC`,
-      sql`SELECT * FROM projects ORDER BY created_at DESC`
+      sql`SELECT * FROM tasks WHERE user_id = ${userId} ORDER BY created_at DESC`,
+      sql`SELECT * FROM projects WHERE user_id = ${userId} ORDER BY created_at DESC`
     ]);
 
     return {
@@ -100,8 +111,8 @@ async function getServerDataSince(lastSync) {
   }
 
   const [tasks, projects] = await Promise.all([
-    sql`SELECT * FROM tasks WHERE updated_at > ${lastSync} ORDER BY created_at DESC`,
-    sql`SELECT * FROM projects WHERE updated_at > ${lastSync} ORDER BY created_at DESC`
+    sql`SELECT * FROM tasks WHERE user_id = ${userId} AND updated_at > ${lastSync} ORDER BY created_at DESC`,
+    sql`SELECT * FROM projects WHERE user_id = ${userId} AND updated_at > ${lastSync} ORDER BY created_at DESC`
   ]);
 
   return {
@@ -119,7 +130,7 @@ async function getServerDataSince(lastSync) {
   };
 }
 
-async function processClientChanges(clientTasks, clientProjects) {
+async function processClientChanges(clientTasks, clientProjects, userId) {
   const results = { tasks: [], projects: [] };
 
   // Handle task changes (supports wrapped {type, action, data} or raw task objects)
@@ -130,9 +141,10 @@ async function processClientChanges(clientTasks, clientProjects) {
     try {
       if (task._action === 'create') {
         const [newTask] = await sql`
-          INSERT INTO tasks (id, title, description, completed, priority, due_date, project_id, created_at, updated_at)
+          INSERT INTO tasks (id, user_id, title, description, completed, priority, due_date, project_id, created_at, updated_at)
           VALUES (
             ${task.id},
+            ${userId},
             ${task.title},
             ${task.description || null},
             ${Boolean(task.completed)},
@@ -160,7 +172,7 @@ async function processClientChanges(clientTasks, clientProjects) {
               due_date = ${task.dueDate ? new Date(task.dueDate).toISOString() : null}, 
               project_id = ${task.projectId || null},
               updated_at = ${new Date(task.updatedAt).toISOString()}
-          WHERE id = ${task.id}
+          WHERE id = ${task.id} AND user_id = ${userId}
           RETURNING *
         `;
         results.tasks.push({
@@ -170,7 +182,7 @@ async function processClientChanges(clientTasks, clientProjects) {
           dueDate: updatedTask.due_date ? new Date(updatedTask.due_date) : null
         });
       } else if (task._action === 'delete') {
-        await sql`DELETE FROM tasks WHERE id = ${task.id}`;
+        await sql`DELETE FROM tasks WHERE id = ${task.id} AND user_id = ${userId}`;
         results.tasks.push({ id: task.id, _action: 'deleted' });
       }
     } catch (error) {
@@ -186,9 +198,10 @@ async function processClientChanges(clientTasks, clientProjects) {
     try {
       if (project._action === 'create') {
         const [newProject] = await sql`
-          INSERT INTO projects (id, name, description, color, created_at, updated_at)
+          INSERT INTO projects (id, user_id, name, description, color, created_at, updated_at)
           VALUES (
             ${project.id},
+            ${userId},
             ${project.name},
             ${project.description || null},
             ${project.color},
@@ -209,7 +222,7 @@ async function processClientChanges(clientTasks, clientProjects) {
               description = ${project.description || null}, 
               color = ${project.color},
               updated_at = ${new Date(project.updatedAt).toISOString()}
-          WHERE id = ${project.id}
+          WHERE id = ${project.id} AND user_id = ${userId}
           RETURNING *
         `;
         results.projects.push({
@@ -218,7 +231,7 @@ async function processClientChanges(clientTasks, clientProjects) {
           updatedAt: updatedProject.updated_at
         });
       } else if (project._action === 'delete') {
-        await sql`DELETE FROM projects WHERE id = ${project.id}`;
+        await sql`DELETE FROM projects WHERE id = ${project.id} AND user_id = ${userId}`;
         results.projects.push({ id: project.id, _action: 'deleted' });
       }
     } catch (error) {

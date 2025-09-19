@@ -1,5 +1,5 @@
 import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Router, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 
@@ -7,6 +7,7 @@ import { RouterModule } from '@angular/router';
 import { MenubarModule } from 'primeng/menubar';
 import { ButtonModule } from 'primeng/button';
 import { BadgeModule } from 'primeng/badge';
+import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -22,16 +23,14 @@ import { BadgeModule } from 'primeng/badge';
 export class App {
   title = signal('xTodo');
   
-  menuItems = [
-    {
-      label: 'Tasks',
-      icon: 'pi pi-list',
-      routerLink: '/'
-    },
-    {
-      label: 'Projects',
-      icon: 'pi pi-folder',
-      routerLink: '/projects'
-    }
-  ];
+  constructor(private auth: AuthService, private router: Router) {}
+
+  isAuthenticated(): boolean {
+    return !!this.auth.getToken();
+  }
+
+  signout(): void {
+    this.auth.signout();
+    this.router.navigate(['/']);
+  }
 }

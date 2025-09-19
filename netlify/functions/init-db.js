@@ -23,9 +23,23 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    // Users table
+    await sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(255) PRIMARY KEY,
+        full_name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+      )
+    `;
+
+    // Projects table scoped to user
     await sql`
       CREATE TABLE IF NOT EXISTS projects (
         id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         name VARCHAR(255) NOT NULL,
         description TEXT,
         color VARCHAR(7) NOT NULL DEFAULT '#3B82F6',
@@ -34,9 +48,11 @@ exports.handler = async (event, context) => {
       )
     `;
 
+    // Tasks table scoped to user
     await sql`
       CREATE TABLE IF NOT EXISTS tasks (
         id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         title VARCHAR(255) NOT NULL,
         description TEXT,
         completed BOOLEAN NOT NULL DEFAULT FALSE,
@@ -48,7 +64,10 @@ exports.handler = async (event, context) => {
       )
     `;
 
+    // Indexes
     await sql`CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completed)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date)`;
@@ -60,7 +79,7 @@ exports.handler = async (event, context) => {
       headers,
       body: JSON.stringify({ 
         message: 'Database initialized successfully',
-        tables: ['projects', 'tasks']
+        tables: ['users', 'projects', 'tasks']
       })
     };
   } catch (error) {

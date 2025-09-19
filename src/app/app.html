@@ -1,6 +1,6 @@
 <div class="min-h-screen bg-gray-50">
   <!-- Navigation -->
-  <p-menubar class="shadow-sm border-b border-gray-200">
+  <p-menubar class="shadow-sm border-b border-gray-200" *ngIf="isAuthenticated()">
     <ng-template pTemplate="start">
       <div class="flex items-center space-x-4">
         <div class="flex items-center space-x-2">
@@ -16,7 +16,7 @@
           pButton 
           label="Tasks" 
           icon="pi pi-list"
-          routerLink="/"
+          routerLink="/app"
           routerLinkActive="p-button-outlined"
           class="p-button-text"
         ></button>
@@ -28,6 +28,7 @@
           routerLinkActive="p-button-outlined"
           class="p-button-text"
         ></button>
+        <button pButton label="Sign out" icon="pi pi-sign-out" class="p-button-danger p-button-text" (click)="signout()"></button>
       </div>
     </ng-template>
   </p-menubar>

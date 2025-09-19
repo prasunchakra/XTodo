@@ -1,0 +1,71 @@
+<div class="min-h-screen bg-gradient-to-b from-white to-gray-50">
+  <div class="max-w-6xl mx-auto px-4 pt-12 pb-4">
+    <div class="flex items-center justify-center mb-8">
+      <img src="/logo.png" alt="xTodo Logo" class="h-10 w-10 object-contain mr-3">
+      <h1 class="text-3xl font-bold text-gray-900">xTodo</h1>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+      <div class="text-center lg:text-left px-2">
+        <h2 class="text-3xl font-semibold text-gray-900 mb-3">Organize your day with ease</h2>
+        <p class="text-gray-600 mb-6">Fast, simple, and beautiful task management. Create projects, set priorities, and get things done.</p>
+        <ul class="text-gray-700 space-y-2 text-sm">
+          <li>• Quick add and complete tasks</li>
+          <li>• Projects, priorities, and due dates</li>
+          <li>• Works offline, syncs when online</li>
+        </ul>
+      </div>
+
+      <div class="flex justify-center lg:justify-end">
+        <p-card class="w-full max-w-md" [style]="{overflow: 'hidden'}">
+          <ng-template pTemplate="header">
+            <div class="text-center">
+              <h3 class="text-xl font-semibold text-gray-900">Welcome</h3>
+              <p class="text-gray-600">Sign in or create an account</p>
+            </div>
+          </ng-template>
+
+          <div class="space-y-4">
+            <div class="flex justify-center mb-2">
+              <div class="inline-flex rounded-md bg-gray-100 p-1">
+                <button pButton label="Sign In" (click)="mode='signin'" [class]="mode==='signin' ? 'p-button p-button-sm' : 'p-button-text p-button-sm'"></button>
+                <button pButton label="Sign Up" (click)="mode='signup'" [class]="mode==='signup' ? 'p-button p-button-sm' : 'p-button-text p-button-sm'"></button>
+              </div>
+            </div>
+
+            <ng-container *ngIf="mode === 'signin'; else signupTpl">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input pInputText type="email" [(ngModel)]="email" class="w-full" placeholder="you@example.com" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input pInputText type="password" [(ngModel)]="password" class="w-full" placeholder="••••••••" />
+              </div>
+
+              <div *ngIf="error" class="text-red-600 text-sm">{{ error }}</div>
+
+              <button pButton class="w-full" [loading]="loading" (click)="signin()" label="Sign In"></button>
+            </ng-container>
+
+            <ng-template #signupTpl>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Full name</label>
+                <input pInputText type="text" [(ngModel)]="fullName" class="w-full" placeholder="John Doe" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input pInputText type="email" [(ngModel)]="email" class="w-full" placeholder="you@example.com" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input pInputText type="password" [(ngModel)]="password" class="w-full" placeholder="••••••••" />
+              </div>
+              <div *ngIf="error" class="text-red-600 text-sm">{{ error }}</div>
+              <button pButton class="w-full" [loading]="loading" (click)="signup()" label="Create account"></button>
+            </ng-template>
+          </div>
+        </p-card>
+      </div>
+    </div>
+  </div>
+</div>

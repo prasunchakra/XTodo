@@ -36,6 +36,8 @@
     "@netlify/neon": "^0.1.0",
     "@primeuix/themes": "^1.2.3",
     "@tailwindcss/postcss": "^4.1.12",
+    "bcryptjs": "^3.0.2",
+    "jsonwebtoken": "^9.0.2",
     "netlify-cli": "^23.6.0",
     "pg": "^8.16.3",
     "postcss": "^8.5.6",
