@@ -1,5 +1,27 @@
+export interface User {
+  id: string;
+  fullName: string;
+  email: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Project {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  color: string;
+  createdAt: Date;
+  updatedAt: Date;
+  // Optional: for UI convenience
+  user?: User;
+  tasks?: Task[];
+}
+
 export interface Task {
   id: string;
+  userId: string;
   title: string;
   description?: string;
   completed: boolean;
@@ -8,15 +30,9 @@ export interface Task {
   projectId?: string;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  description?: string;
-  color: string;
-  createdAt: Date;
-  updatedAt: Date;
+  // Optional: for UI convenience
+  user?: User;
+  project?: Project;
 }
 
 export interface TaskFilters {

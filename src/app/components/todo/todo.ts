@@ -55,9 +55,11 @@ export class TodoComponent implements OnInit, OnDestroy {
   tasks: Task[] = [];
   projects: Project[] = [];
   filteredTasks: Task[] = [];
+  groupedTasks: { project: Project | null; tasks: Task[] }[] = [];
   statistics: any = {};
   isSyncing = false;
   pendingChanges = 0;
+  showProjectGroups = true;
   
   // Form data
   newTask: Partial<Task> = {
@@ -168,7 +170,7 @@ export class TodoComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> = {
+    const taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'userId'> = {
       title: this.newTask.title.trim(),
       description: this.newTask.description?.trim() || '',
       completed: false,
@@ -283,6 +285,7 @@ export class TodoComponent implements OnInit, OnDestroy {
         next: (tasks) => {
           this.tasks = tasks;
           this.filteredTasks = tasks;
+          this.groupTasksByProject();
         },
         error: (error) => {
           console.error('Error applying filters:', error);
@@ -293,6 +296,43 @@ export class TodoComponent implements OnInit, OnDestroy {
           });
         }
       });
+  }
+
+  groupTasksByProject(): void {
+    const grouped: { project: Project | null; tasks: Task[] }[] = [];
+    
+    // Group tasks by project
+    const tasksByProject = new Map<string, Task[]>();
+    const tasksWithoutProject: Task[] = [];
+    
+    this.filteredTasks.forEach(task => {
+      if (task.projectId) {
+        const projectTasks = tasksByProject.get(task.projectId) || [];
+        projectTasks.push(task);
+        tasksByProject.set(task.projectId, projectTasks);
+      } else {
+        tasksWithoutProject.push(task);
+      }
+    });
+    
+    // Add tasks without project first
+    if (tasksWithoutProject.length > 0) {
+      grouped.push({ project: null, tasks: tasksWithoutProject });
+    }
+    
+    // Add tasks grouped by project
+    this.projects.forEach(project => {
+      const projectTasks = tasksByProject.get(project.id);
+      if (projectTasks && projectTasks.length > 0) {
+        grouped.push({ project, tasks: projectTasks });
+      }
+    });
+    
+    this.groupedTasks = grouped;
+  }
+
+  toggleProjectGrouping(): void {
+    this.showProjectGroups = !this.showProjectGroups;
   }
 
   resetNewTask(): void {
@@ -362,28 +402,6 @@ export class TodoComponent implements OnInit, OnDestroy {
             detail: 'Failed to sync with server. Changes are saved locally.'
           });
           this.isSyncing = false;
-        }
-      });
-  }
-
-  initializeDatabase(): void {
-    this.syncService.initializeDatabase()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (response) => {
-          this.messageService.add({
-            severity: 'success',
-            summary: 'Database Initialized',
-            detail: 'Database tables created successfully'
-          });
-        },
-        error: (error) => {
-          console.error('Database initialization failed:', error);
-          this.messageService.add({
-            severity: 'error',
-            summary: 'Database Error',
-            detail: 'Failed to initialize database'
-          });
         }
       });
   }

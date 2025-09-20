@@ -29,7 +29,7 @@ export class ProjectService {
   }
 
   // Create a new project
-  addProject(projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Observable<Project> {
+  addProject(projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Observable<Project> {
     const newProject = this.syncService.addProject(projectData);
     return of(newProject);
   }

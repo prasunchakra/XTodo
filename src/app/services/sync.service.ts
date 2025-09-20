@@ -4,6 +4,7 @@ import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 import { catchError, map, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { Task, Project } from '../models/task';
+import { AuthService } from './auth.service';
 
 interface SyncData {
   tasks: Task[];
@@ -27,11 +28,6 @@ interface ServerResponse {
   providedIn: 'root'
 })
 export class SyncService {
-  private readonly TASKS_KEY = 'xtodo_tasks';
-  private readonly PROJECTS_KEY = 'xtodo_projects';
-  private readonly LAST_SYNC_KEY = 'xtodo_last_sync';
-  private readonly PENDING_CHANGES_KEY = 'xtodo_pending_changes';
-
   private tasksSubject = new BehaviorSubject<Task[]>([]);
   private projectsSubject = new BehaviorSubject<Project[]>([]);
   private pendingChangesSubject = new BehaviorSubject<any[]>([]);
@@ -40,9 +36,21 @@ export class SyncService {
   public projects$ = this.projectsSubject.asObservable();
   public pendingChanges$ = this.pendingChangesSubject.asObservable();
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private authService: AuthService) {
     this.loadFromStorage();
     this.loadPendingChanges();
+  }
+
+  // Get user-specific storage keys
+  private getStorageKeys() {
+    const user = this.authService.getCurrentUserSnapshot();
+    const userId = user?.id || 'anonymous';
+    return {
+      TASKS_KEY: `xtodo_tasks_${userId}`,
+      PROJECTS_KEY: `xtodo_projects_${userId}`,
+      LAST_SYNC_KEY: `xtodo_last_sync_${userId}`,
+      PENDING_CHANGES_KEY: `xtodo_pending_changes_${userId}`
+    };
   }
 
   // Synchronous snapshots for consumers that need immediate values
@@ -52,6 +60,32 @@ export class SyncService {
 
   public getCurrentProjectsSnapshot(): Project[] {
     return this.projectsSubject.value;
+  }
+
+  // Helper methods for project-task relationships
+  public getTasksByProject(projectId: string): Task[] {
+    return this.tasksSubject.value.filter(task => task.projectId === projectId);
+  }
+
+  public getTasksWithoutProject(): Task[] {
+    return this.tasksSubject.value.filter(task => !task.projectId);
+  }
+
+  public getProjectWithTasks(projectId: string): Project | null {
+    const project = this.projectsSubject.value.find(p => p.id === projectId);
+    if (!project) return null;
+    
+    return {
+      ...project,
+      tasks: this.getTasksByProject(projectId)
+    };
+  }
+
+  public getAllProjectsWithTasks(): Project[] {
+    return this.projectsSubject.value.map(project => ({
+      ...project,
+      tasks: this.getTasksByProject(project.id)
+    }));
   }
 
   // Initialize database (call once)
@@ -102,10 +136,16 @@ export class SyncService {
   }
 
   // Task operations (optimistic updates)
-  addTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Task {
+  addTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Task {
+    const user = this.authService.getCurrentUserSnapshot();
+    if (!user) {
+      throw new Error('User must be authenticated to add tasks');
+    }
+
     const newTask: Task = {
       ...task,
       id: this.generateId(),
+      userId: user.id,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -164,10 +204,16 @@ export class SyncService {
   }
 
   // Project operations (optimistic updates)
-  addProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Project {
+  addProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Project {
+    const user = this.authService.getCurrentUserSnapshot();
+    if (!user) {
+      throw new Error('User must be authenticated to add projects');
+    }
+
     const newProject: Project = {
       ...project,
       id: this.generateId(),
+      userId: user.id,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -262,8 +308,9 @@ export class SyncService {
   // Private helper methods
   private loadFromStorage(): void {
     try {
-      const tasks = JSON.parse(localStorage.getItem(this.TASKS_KEY) || '[]');
-      const projects = JSON.parse(localStorage.getItem(this.PROJECTS_KEY) || '[]');
+      const keys = this.getStorageKeys();
+      const tasks = JSON.parse(localStorage.getItem(keys.TASKS_KEY) || '[]');
+      const projects = JSON.parse(localStorage.getItem(keys.PROJECTS_KEY) || '[]');
       
       // Convert date strings back to Date objects
       const processedTasks = tasks.map((task: any) => ({
@@ -288,8 +335,9 @@ export class SyncService {
 
   private saveToStorage(): void {
     try {
-      localStorage.setItem(this.TASKS_KEY, JSON.stringify(this.tasksSubject.value));
-      localStorage.setItem(this.PROJECTS_KEY, JSON.stringify(this.projectsSubject.value));
+      const keys = this.getStorageKeys();
+      localStorage.setItem(keys.TASKS_KEY, JSON.stringify(this.tasksSubject.value));
+      localStorage.setItem(keys.PROJECTS_KEY, JSON.stringify(this.projectsSubject.value));
     } catch (error) {
       console.error('Error saving to storage:', error);
     }
@@ -297,7 +345,8 @@ export class SyncService {
 
   private loadPendingChanges(): void {
     try {
-      const pending = JSON.parse(localStorage.getItem(this.PENDING_CHANGES_KEY) || '[]');
+      const keys = this.getStorageKeys();
+      const pending = JSON.parse(localStorage.getItem(keys.PENDING_CHANGES_KEY) || '[]');
       this.pendingChangesSubject.next(pending);
     } catch (error) {
       console.error('Error loading pending changes:', error);
@@ -317,7 +366,8 @@ export class SyncService {
       timestamp: new Date().toISOString()
     });
     this.pendingChangesSubject.next(pending);
-    localStorage.setItem(this.PENDING_CHANGES_KEY, JSON.stringify(pending));
+    const keys = this.getStorageKeys();
+    localStorage.setItem(keys.PENDING_CHANGES_KEY, JSON.stringify(pending));
   }
 
   private clearConfirmedChanges(confirmed: any): void {
@@ -330,7 +380,8 @@ export class SyncService {
     
     const remaining = pending.filter(change => !confirmedIds.has(change.data.id));
     this.pendingChangesSubject.next(remaining);
-    localStorage.setItem(this.PENDING_CHANGES_KEY, JSON.stringify(remaining));
+    const keys = this.getStorageKeys();
+    localStorage.setItem(keys.PENDING_CHANGES_KEY, JSON.stringify(remaining));
   }
 
   private updateLocalData(serverData: { tasks: Task[]; projects: Project[] }): void {
@@ -356,11 +407,13 @@ export class SyncService {
   }
 
   private getLastSync(): string | null {
-    return localStorage.getItem(this.LAST_SYNC_KEY);
+    const keys = this.getStorageKeys();
+    return localStorage.getItem(keys.LAST_SYNC_KEY);
   }
 
   private setLastSync(timestamp: string): void {
-    localStorage.setItem(this.LAST_SYNC_KEY, timestamp);
+    const keys = this.getStorageKeys();
+    localStorage.setItem(keys.LAST_SYNC_KEY, timestamp);
   }
 
   private generateId(): string {

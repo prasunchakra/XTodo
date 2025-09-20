@@ -183,6 +183,7 @@ export class StorageService {
     return [
       {
         id: 'personal',
+        userId: 'default-user',
         name: 'Personal',
         description: 'Personal tasks and goals',
         color: '#3B82F6',
@@ -191,6 +192,7 @@ export class StorageService {
       },
       {
         id: 'work',
+        userId: 'default-user',
         name: 'Work',
         description: 'Work-related tasks and projects',
         color: '#10B981',

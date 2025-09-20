@@ -129,7 +129,7 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'> = {
+    const projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'userId'> = {
       name: this.newProject.name.trim(),
       description: this.newProject.description?.trim() || '',
       color: this.newProject.color || '#3B82F6'

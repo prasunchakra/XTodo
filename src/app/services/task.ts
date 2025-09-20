@@ -103,7 +103,7 @@ export class TaskService {
   }
 
   // Add a new task
-  addTask(taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Observable<Task> {
+  addTask(taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Observable<Task> {
     const newTask = this.syncService.addTask(taskData);
     return of(newTask);
   }

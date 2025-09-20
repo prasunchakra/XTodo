@@ -3,10 +3,27 @@ import jwt from 'jsonwebtoken';
 
 const sql = neon();
 
+// Authentication helper
+async function authenticate(headers) {
+  try {
+    const authHeader = headers.authorization || headers.Authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return null;
+    }
+
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret_change_me');
+    return decoded;
+  } catch (error) {
+    console.error('Authentication error:', error);
+    return null;
+  }
+}
+
 exports.handler = async (event, context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Content-Type': 'application/json'
   };
