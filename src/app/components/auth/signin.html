@@ -27,42 +27,44 @@
           <div class="space-y-4">
             <div class="flex justify-center mb-2">
               <div class="inline-flex rounded-md bg-gray-100 p-1">
-                <button pButton label="Sign In" (click)="mode='signin'" [class]="mode==='signin' ? 'p-button p-button-sm' : 'p-button-text p-button-sm'"></button>
-                <button pButton label="Sign Up" (click)="mode='signup'" [class]="mode==='signup' ? 'p-button p-button-sm' : 'p-button-text p-button-sm'"></button>
+                <button pButton label="Sign In" (click)="mode.set('signin')" [class]="mode() === 'signin' ? 'p-button p-button-sm' : 'p-button-text p-button-sm'"></button>
+                <button pButton label="Sign Up" (click)="mode.set('signup')" [class]="mode() === 'signup' ? 'p-button p-button-sm' : 'p-button-text p-button-sm'"></button>
               </div>
             </div>
 
-            <ng-container *ngIf="mode === 'signin'; else signupTpl">
+            @if (mode() === 'signin') {
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input pInputText type="email" [(ngModel)]="email" class="w-full" placeholder="you@example.com" />
+                <input pInputText type="email" [ngModel]="email()" (ngModelChange)="email.set($event)" class="w-full" placeholder="you@example.com" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                <input pInputText type="password" [(ngModel)]="password" class="w-full" placeholder="••••••••" />
+                <input pInputText type="password" [ngModel]="password()" (ngModelChange)="password.set($event)" class="w-full" placeholder="••••••••" />
               </div>
 
-              <div *ngIf="error" class="text-red-600 text-sm">{{ error }}</div>
+              @if (error()) {
+                <div class="text-red-600 text-sm">{{ error() }}</div>
+              }
 
-              <button pButton class="w-full" [loading]="loading" (click)="signin()" label="Sign In"></button>
-            </ng-container>
-
-            <ng-template #signupTpl>
+              <button pButton class="w-full" [loading]="loading()" (click)="signin()" label="Sign In"></button>
+            } @else {
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Full name</label>
-                <input pInputText type="text" [(ngModel)]="fullName" class="w-full" placeholder="John Doe" />
+                <input pInputText type="text" [ngModel]="fullName()" (ngModelChange)="fullName.set($event)" class="w-full" placeholder="John Doe" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input pInputText type="email" [(ngModel)]="email" class="w-full" placeholder="you@example.com" />
+                <input pInputText type="email" [ngModel]="email()" (ngModelChange)="email.set($event)" class="w-full" placeholder="you@example.com" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                <input pInputText type="password" [(ngModel)]="password" class="w-full" placeholder="••••••••" />
+                <input pInputText type="password" [ngModel]="password()" (ngModelChange)="password.set($event)" class="w-full" placeholder="••••••••" />
               </div>
-              <div *ngIf="error" class="text-red-600 text-sm">{{ error }}</div>
-              <button pButton class="w-full" [loading]="loading" (click)="signup()" label="Create account"></button>
-            </ng-template>
+              @if (error()) {
+                <div class="text-red-600 text-sm">{{ error() }}</div>
+              }
+              <button pButton class="w-full" [loading]="loading()" (click)="signup()" label="Create account"></button>
+            }
           </div>
         </p-card>
       </div>

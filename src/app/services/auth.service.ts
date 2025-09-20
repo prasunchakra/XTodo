@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -19,10 +19,10 @@ export class AuthService {
   private readonly TOKEN_KEY = 'xtodo_token';
   private readonly USER_KEY = 'xtodo_user';
 
+  private http = inject(HttpClient);
+
   private currentUserSubject = new BehaviorSubject<AuthUser | null>(this.loadUser());
   public currentUser$ = this.currentUserSubject.asObservable();
-
-  constructor(private http: HttpClient) {}
 
   signup(fullName: string, email: string, password: string): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${environment.apiUrl}/auth`, { action: 'signup', fullName, email, password })

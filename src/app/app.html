@@ -1,6 +1,7 @@
 <div class="min-h-screen bg-gray-50">
   <!-- Navigation -->
-  <p-menubar class="shadow-sm border-b border-gray-200" *ngIf="isAuthenticated()">
+  @if (isAuthenticated()) {
+    <p-menubar class="shadow-sm border-b border-gray-200">
     <ng-template pTemplate="start">
       <div class="flex items-center space-x-4">
         <div class="flex items-center space-x-2">
@@ -31,7 +32,8 @@
         <button pButton label="Sign out" icon="pi pi-sign-out" class="p-button-danger p-button-text" (click)="signout()"></button>
       </div>
     </ng-template>
-  </p-menubar>
+    </p-menubar>
+  }
 
   <!-- Main Content -->
   <main class="min-h-screen">

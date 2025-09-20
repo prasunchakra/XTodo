@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Observable, of, throwError } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { SyncService } from './sync.service';
@@ -8,7 +8,7 @@ import { Project } from '../models/task';
   providedIn: 'root'
 })
 export class ProjectService {
-  constructor(private syncService: SyncService) {}
+  private syncService = inject(SyncService);
 
   // Get all projects
   getProjects(): Observable<Project[]> {

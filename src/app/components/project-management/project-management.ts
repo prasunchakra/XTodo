@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
@@ -24,7 +24,6 @@ import { Project, Task } from '../../models/task';
 
 @Component({
   selector: 'app-project-management',
-  standalone: true,
   imports: [
     CommonModule,
     FormsModule,
@@ -42,7 +41,8 @@ import { Project, Task } from '../../models/task';
   ],
   providers: [ConfirmationService, MessageService],
   templateUrl: './project-management.html',
-  styleUrls: ['./project-management.css']
+  styleUrls: ['./project-management.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProjectManagementComponent implements OnInit, OnDestroy {
   projects: Project[] = [];
@@ -69,12 +69,10 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
   
   private destroy$ = new Subject<void>();
 
-  constructor(
-    private projectService: ProjectService,
-    private taskService: TaskService,
-    private confirmationService: ConfirmationService,
-    private messageService: MessageService
-  ) {}
+  private projectService = inject(ProjectService);
+  private taskService = inject(TaskService);
+  private confirmationService = inject(ConfirmationService);
+  private messageService = inject(MessageService);
 
   ngOnInit(): void {
     this.loadData();

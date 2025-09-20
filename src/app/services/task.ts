@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Observable, combineLatest, map, of, throwError } from 'rxjs';
 import { SyncService } from './sync.service';
 import { Task, Project, TaskFilters } from '../models/task';
@@ -7,7 +7,7 @@ import { Task, Project, TaskFilters } from '../models/task';
   providedIn: 'root'
 })
 export class TaskService {
-  constructor(private syncService: SyncService) {}
+  private syncService = inject(SyncService);
 
   // Get all tasks with optional filtering
   getTasks(filters?: TaskFilters): Observable<Task[]> {

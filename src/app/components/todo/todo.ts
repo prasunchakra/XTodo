@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -29,7 +29,6 @@ type ViewType = 'all' | 'active' | 'completed';
 
 @Component({
   selector: 'app-todo',
-  standalone: true,
   imports: [
     CommonModule,
     FormsModule,
@@ -49,7 +48,8 @@ type ViewType = 'all' | 'active' | 'completed';
   ],
   providers: [ConfirmationService, MessageService],
   templateUrl: './todo.html',
-  styleUrls: ['./todo.css']
+  styleUrls: ['./todo.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TodoComponent implements OnInit, OnDestroy {
   tasks: Task[] = [];
@@ -88,13 +88,11 @@ export class TodoComponent implements OnInit, OnDestroy {
   
   private destroy$ = new Subject<void>();
 
-  constructor(
-    private taskService: TaskService,
-    private projectService: ProjectService,
-    private syncService: SyncService,
-    private confirmationService: ConfirmationService,
-    private messageService: MessageService
-  ) {}
+  private taskService = inject(TaskService);
+  private projectService = inject(ProjectService);
+  private syncService = inject(SyncService);
+  private confirmationService = inject(ConfirmationService);
+  private messageService = inject(MessageService);
 
   ngOnInit(): void {
     this.loadData();

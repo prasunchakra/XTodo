@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, signal, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -9,47 +9,48 @@ import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-signin',
-  standalone: true,
   imports: [CommonModule, FormsModule, ButtonModule, InputTextModule, CardModule],
   templateUrl: './signin.html',
-  styleUrls: ['./signin.css']
+  styleUrls: ['./signin.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SigninComponent {
-  mode: 'signin' | 'signup' = 'signin';
-  fullName = '';
-  email = '';
-  password = '';
-  loading = false;
-  error = '';
+  mode = signal<'signin' | 'signup'>('signin');
+  fullName = signal('');
+  email = signal('');
+  password = signal('');
+  loading = signal(false);
+  error = signal('');
 
-  constructor(private auth: AuthService, private router: Router) {}
+  private auth = inject(AuthService);
+  private router = inject(Router);
 
   signin(): void {
-    this.loading = true;
-    this.error = '';
-    this.auth.signin(this.email, this.password).subscribe({
+    this.loading.set(true);
+    this.error.set('');
+    this.auth.signin(this.email(), this.password()).subscribe({
       next: () => {
-        this.loading = false;
+        this.loading.set(false);
         this.router.navigate(['/app']);
       },
       error: (e: any) => {
-        this.loading = false;
-        this.error = e?.error?.error || 'Sign in failed';
+        this.loading.set(false);
+        this.error.set(e?.error?.error || 'Sign in failed');
       }
     });
   }
 
   signup(): void {
-    this.loading = true;
-    this.error = '';
-    this.auth.signup(this.fullName, this.email, this.password).subscribe({
+    this.loading.set(true);
+    this.error.set('');
+    this.auth.signup(this.fullName(), this.email(), this.password()).subscribe({
       next: () => {
-        this.loading = false;
+        this.loading.set(false);
         this.router.navigate(['/app']);
       },
       error: (e: any) => {
-        this.loading = false;
-        this.error = e?.error?.error || 'Sign up failed';
+        this.loading.set(false);
+        this.error.set(e?.error?.error || 'Sign up failed');
       }
     });
   }
