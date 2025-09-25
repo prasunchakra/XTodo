@@ -28,7 +28,7 @@ export class App {
   private router = inject(Router);
 
   isAuthenticated(): boolean {
-    return !!this.auth.getToken();
+    return this.auth.isAuthenticated();
   }
 
   signout(): void {

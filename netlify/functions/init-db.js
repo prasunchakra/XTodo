@@ -23,6 +23,16 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    // Check if tables exist and get their schema
+    const existingTables = await sql`
+      SELECT table_name, column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name IN ('users', 'tasks', 'projects')
+      ORDER BY table_name, ordinal_position
+    `;
+    
+    console.log('Existing tables schema:', existingTables);
+
     // Users table
     await sql`
       CREATE TABLE IF NOT EXISTS users (
@@ -84,10 +94,18 @@ exports.handler = async (event, context) => {
     };
   } catch (error) {
     console.error('Error initializing database:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Failed to initialize database' })
+      body: JSON.stringify({ 
+        error: 'Failed to initialize database',
+        details: error.message 
+      })
     };
   }
 };

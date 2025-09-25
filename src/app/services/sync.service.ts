@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 import { catchError, map, tap } from 'rxjs/operators';
@@ -36,7 +36,10 @@ export class SyncService {
   public projects$ = this.projectsSubject.asObservable();
   public pendingChanges$ = this.pendingChangesSubject.asObservable();
 
-  constructor(private http: HttpClient, private authService: AuthService) {
+  private http = inject(HttpClient);
+  private authService = inject(AuthService);
+
+  constructor() {
     this.loadFromStorage();
     this.loadPendingChanges();
   }
