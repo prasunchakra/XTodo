@@ -1,70 +1,116 @@
-<div class="min-h-screen bg-gradient-to-b from-white to-gray-50">
-  <div class="max-w-6xl mx-auto px-4 pt-12 pb-4">
-    <div class="flex items-center justify-center mb-8">
-      <img src="/logo.png" alt="xTodo Logo" class="h-10 w-10 object-contain mr-3">
-      <h1 class="text-3xl font-bold text-gray-900">xTodo</h1>
+<div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 font-sans">
+  <div class="container mx-auto px-6 py-16 lg:py-24">
+    <div class="flex items-center justify-center mb-12 lg:mb-16">
+      <img src="/logo.png" alt="xTodo Logo" class="h-12 w-12 object-contain mr-4">
+      <h1 class="text-4xl font-bold text-gray-800 tracking-tight">xTodo</h1>
     </div>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-      <div class="text-center lg:text-left px-2">
-        <h2 class="text-3xl font-semibold text-gray-900 mb-3">Organize your day with ease</h2>
-        <p class="text-gray-600 mb-6">Fast, simple, and beautiful task management. Create projects, set priorities, and get things done.</p>
-        <ul class="text-gray-700 space-y-2 text-sm">
-          <li>• Quick add and complete tasks</li>
-          <li>• Projects, priorities, and due dates</li>
-          <li>• Works offline, syncs when online</li>
-        </ul>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-center">
+      <div class="text-center lg:text-left">
+        <h2 class="text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight mb-4">
+          <span class="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+            From Clutter to Clarity.
+          </span>
+        </h2>
+        <p class="text-lg text-gray-600 mb-8 max-w-lg mx-auto lg:mx-0">
+          xTodo is your new personal task manager. Simple, powerful, and beautifully designed to help you stay focused and achieve your goals.
+        </p>
+        
+        <div class="space-y-6">
+          <div class="flex items-start">
+            <div class="flex-shrink-0">
+              <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-slate-800 text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+            </div>
+            <div class="ml-4">
+              <h3 class="text-lg leading-6 font-semibold text-gray-900">Organize with Projects</h3>
+              <p class="mt-1 text-base text-gray-600">Group your tasks into projects to keep your work and personal life perfectly organized.</p>
+            </div>
+          </div>
+          <div class="flex items-start">
+            <div class="flex-shrink-0">
+              <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-slate-800 text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+            </div>
+            <div class="ml-4">
+              <h3 class="text-lg leading-6 font-semibold text-gray-900">Set Priorities</h3>
+              <p class="mt-1 text-base text-gray-600">Focus on what matters most by setting priorities and due dates for every task.</p>
+            </div>
+          </div>
+          <div class="flex items-start">
+            <div class="flex-shrink-0">
+              <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-slate-800 text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M4 4l1.5 1.5A9 9 0 0120.5 18M20 20l-1.5-1.5A9 9 0 003.5 6" />
+                </svg>
+              </div>
+            </div>
+            <div class="ml-4">
+              <h3 class="text-lg leading-6 font-semibold text-gray-900">Syncs Everywhere</h3>
+              <p class="mt-1 text-base text-gray-600">Works offline and syncs across all your devices when you're back online.</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="flex justify-center lg:justify-end">
-        <p-card class="w-full max-w-md" [style]="{overflow: 'hidden'}">
+        <p-card class="w-full max-w-md shadow-2xl rounded-xl ring-1 ring-black ring-opacity-5" [style]="{overflow: 'hidden'}">
           <ng-template pTemplate="header">
-            <div class="text-center">
-              <h3 class="text-xl font-semibold text-gray-900">Welcome</h3>
-              <p class="text-gray-600">Sign in or create an account</p>
+            <div class="text-center py-6 px-6 bg-gray-50 border-b border-gray-200">
+              <h3 class="text-xl font-semibold text-gray-900">Get Started Now</h3>
+              <p class="text-sm text-gray-600 mt-1">Sign in or create your free account</p>
             </div>
           </ng-template>
 
-          <div class="space-y-4">
-            <div class="flex justify-center mb-2">
-              <div class="inline-flex rounded-md bg-gray-100 p-1">
-                <button pButton label="Sign In" (click)="mode.set('signin')" [class]="mode() === 'signin' ? 'p-button p-button-sm' : 'p-button-text p-button-sm'"></button>
-                <button pButton label="Sign Up" (click)="mode.set('signup')" [class]="mode() === 'signup' ? 'p-button p-button-sm' : 'p-button-text p-button-sm'"></button>
+          <div class="p-6 sm:p-8">
+            <div class="flex justify-center mb-6">
+              <div class="inline-flex rounded-lg bg-gray-100 p-1">
+                <button pButton (click)="mode.set('signin')" [text]="mode() !== 'signin'" [raised]="mode() === 'signin'" label="Sign In" class="p-button-sm !px-6" [ngClass]="{'p-button-secondary !shadow-md': mode() === 'signin'}"></button>
+                <button pButton (click)="mode.set('signup')" [text]="mode() !== 'signup'" [raised]="mode() === 'signup'" label="Sign Up" class="p-button-sm !px-6" [ngClass]="{'p-button-secondary !shadow-md': mode() === 'signup'}"></button>
               </div>
             </div>
 
-            @if (mode() === 'signin') {
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input pInputText type="email" [ngModel]="email()" (ngModelChange)="email.set($event)" class="w-full" placeholder="you@example.com" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                <input pInputText type="password" [ngModel]="password()" (ngModelChange)="password.set($event)" class="w-full" placeholder="••••••••" />
-              </div>
+            <form class="space-y-4">
+              @if (mode() === 'signin') {
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input pInputText type="email" name="email" [ngModel]="email()" (ngModelChange)="email.set($event)" class="w-full" placeholder="you@example.com" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <input pInputText type="password" name="password" [ngModel]="password()" (ngModelChange)="password.set($event)" class="w-full" placeholder="••••••••" />
+                </div>
 
-              @if (error()) {
-                <div class="text-red-600 text-sm">{{ error() }}</div>
-              }
+                @if (error()) {
+                  <div class="text-red-600 text-sm pt-1">{{ error() }}</div>
+                }
 
-              <button pButton class="w-full" [loading]="loading()" (click)="signin()" label="Sign In"></button>
-            } @else {
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Full name</label>
-                <input pInputText type="text" [ngModel]="fullName()" (ngModelChange)="fullName.set($event)" class="w-full" placeholder="John Doe" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input pInputText type="email" [ngModel]="email()" (ngModelChange)="email.set($event)" class="w-full" placeholder="you@example.com" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                <input pInputText type="password" [ngModel]="password()" (ngModelChange)="password.set($event)" class="w-full" placeholder="••••••••" />
-              </div>
-              @if (error()) {
-                <div class="text-red-600 text-sm">{{ error() }}</div>
+                <button pButton class="w-full !mt-6 !bg-slate-900 !border-slate-900" [loading]="loading()" (click)="signin()" label="Sign In"></button>
+              } @else {
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Full name</label>
+                  <input pInputText type="text" name="fullName" [ngModel]="fullName()" (ngModelChange)="fullName.set($event)" class="w-full" placeholder="John Doe" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input pInputText type="email" name="email" [ngModel]="email()" (ngModelChange)="email.set($event)" class="w-full" placeholder="you@example.com" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <input pInputText type="password" name="password" [ngModel]="password()" (ngModelChange)="password.set($event)" class="w-full" placeholder="••••••••" />
+                </div>
+                @if (error()) {
+                  <div class="text-red-600 text-sm pt-1">{{ error() }}</div>
+                }
+                <button pButton class="w-full !mt-6 !bg-slate-900 !border-slate-900" [loading]="loading()" (click)="signup()" label="Create Account"></button>
               }
-              <button pButton class="w-full" [loading]="loading()" (click)="signup()" label="Create account"></button>
-            }
+            </form>
           </div>
         </p-card>
       </div>

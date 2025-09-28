@@ -8,12 +8,31 @@ async function authenticate(headers) {
   try {
     const authHeader = headers.authorization || headers.Authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('No valid authorization header found');
       return null;
     }
 
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret_change_me');
-    return decoded;
+    
+    // Log the decoded token structure for debugging
+    console.log('Decoded JWT payload:', JSON.stringify(decoded, null, 2));
+    
+    // Ensure the decoded token has required fields
+    // JWT standard uses 'sub' (subject) field for user identifier
+    if (!decoded.sub && !decoded.id) {
+      console.error('JWT token missing required sub or id field:', decoded);
+      return null;
+    }
+    
+    // Normalize the user object to always have an 'id' field
+    // Use 'sub' if available (JWT standard), otherwise fall back to 'id'
+    const normalizedUser = {
+      ...decoded,
+      id: decoded.sub || decoded.id
+    };
+    
+    return normalizedUser;
   } catch (error) {
     console.error('Authentication error:', error);
     return null;
@@ -72,21 +91,46 @@ exports.handler = async (event, context) => {
         if (!authUser) {
           return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
         }
+        
+        // Validate that the user has a valid ID
+        if (!authUser.id) {
+          console.error('Authentication successful but user ID is missing:', authUser);
+          return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid user data' }) };
+        }
+        
         const { tasks: clientTasks, projects: clientProjects, lastSync } = body;
 
-        const serverData = await getServerDataSince(lastSync, authUser.id);
+        try {
+          const serverData = await getServerDataSince(lastSync, authUser.id);
+          const clientChanges = await processClientChanges(clientTasks, clientProjects, authUser.id);
 
-        const clientChanges = await processClientChanges(clientTasks, clientProjects, authUser.id);
-
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            serverChanges: serverData,
-            clientChangesConfirmed: clientChanges,
-            newLastSync: new Date().toISOString()
-          })
-        };
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+              serverChanges: serverData,
+              clientChangesConfirmed: clientChanges,
+              newLastSync: new Date().toISOString()
+            })
+          };
+        } catch (syncError) {
+          console.error('Error during sync operation:', syncError);
+          console.error('User ID:', authUser.id);
+          console.error('Client data:', { 
+            tasksCount: clientTasks?.length || 0, 
+            projectsCount: clientProjects?.length || 0,
+            lastSync 
+          });
+          
+          return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ 
+              error: 'Sync operation failed',
+              details: syncError.message 
+            })
+          };
+        }
 
       default:
         return {
@@ -106,6 +150,12 @@ exports.handler = async (event, context) => {
 };
 
 async function getServerDataSince(lastSync, userId) {
+  // Validate userId is not null/undefined
+  if (!userId) {
+    console.error('getServerDataSince called with null/undefined userId');
+    throw new Error('Invalid user ID provided');
+  }
+  
   if (!lastSync) {
     const [tasks, projects] = await Promise.all([
       sql`SELECT * FROM tasks WHERE user_id = ${userId} ORDER BY created_at DESC`,
@@ -149,6 +199,12 @@ async function getServerDataSince(lastSync, userId) {
 
 async function processClientChanges(clientTasks, clientProjects, userId) {
   const results = { tasks: [], projects: [] };
+  
+  // Validate userId is not null/undefined
+  if (!userId) {
+    console.error('processClientChanges called with null/undefined userId');
+    throw new Error('Invalid user ID provided');
+  }
 
   // Handle task changes (supports wrapped {type, action, data} or raw task objects)
   for (const item of (clientTasks || [])) {
