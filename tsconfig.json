@@ -3,7 +3,12 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
+    // Strict mode is enabled to catch potential errors at compile time
     "strict": true,
+    // Explicitly enforce no implicit any types for better type safety
+    "noImplicitAny": true,
+    // Explicitly enforce strict null checks to prevent null/undefined errors
+    "strictNullChecks": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,

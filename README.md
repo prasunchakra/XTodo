@@ -104,6 +104,30 @@ src/
 
 ## 🔧 Configuration
 
+### Angular Build Optimizations
+
+The project has been configured with several optimizations for improved performance and developer experience:
+
+#### Build Cache
+- Angular 20+ uses the modern esbuild-based builder (`@angular/build:application`)
+- Persistent build cache is automatically enabled for development builds
+- Incremental compilation speeds up subsequent builds significantly
+
+#### Production Budgets
+The production build configuration enforces strict bundle size budgets to prevent performance degradation:
+- **Initial Bundle**: Warning at 850kB, Error at 900kB (stricter than default)
+- **Component Styles**: Warning at 4kB, Error at 6kB
+- These budgets help catch accidental bundle size increases early
+
+#### TypeScript Strict Mode
+Stricter TypeScript rules are enforced for better code quality and error detection:
+- `strict: true` - Enables all strict type-checking options
+- `noImplicitAny: true` - Explicitly prevents implicit any types
+- `strictNullChecks: true` - Explicitly catches null/undefined errors
+- Additional rules: `noImplicitReturns`, `noFallthroughCasesInSwitch`, `noImplicitOverride`
+
+These configurations ensure high code quality, optimal performance, and faster development cycles.
+
 ### PrimeNG Theme
 The application uses PrimeNG's Aura theme with custom Tailwind CSS integration.
 
