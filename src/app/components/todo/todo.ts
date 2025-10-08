@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy, ChangeDe
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, takeUntil, debounceTime, distinctUntilChanged } from 'rxjs';
 
 // PrimeNG Components
 import { CardModule } from 'primeng/card';
@@ -18,6 +18,9 @@ import { ToastModule } from 'primeng/toast';
 import { ChipModule } from 'primeng/chip';
 import { BadgeModule } from 'primeng/badge';
 import { TooltipModule } from 'primeng/tooltip';
+import { ScrollerModule } from 'primeng/scroller';
+import { SkeletonModule } from 'primeng/skeleton';
+import { ProgressSpinnerModule } from 'primeng/progressspinner';
 
 // Services and Models
 import { TaskService } from '../../services/task';
@@ -44,7 +47,10 @@ type ViewType = 'all' | 'active' | 'completed';
     ToastModule,
     ChipModule,
     BadgeModule,
-    TooltipModule
+    TooltipModule,
+    ScrollerModule,
+    SkeletonModule,
+    ProgressSpinnerModule
   ],
   providers: [ConfirmationService, MessageService],
   templateUrl: './todo.html',
@@ -65,6 +71,13 @@ export class TodoComponent implements OnInit, OnDestroy {
   lastSyncTime: Date | null = null;
   isOnline = true;
   showPendingDetailsDialog = false;
+  
+  // Loading states
+  isLoadingTasks = false;
+  isLoadingStatistics = false;
+  isAddingTask = false;
+  isDeletingTask: string | null = null;
+  isTogglingTask: string | null = null;
   
   // Form data
   newTask: Partial<Task> = {
@@ -96,6 +109,7 @@ export class TodoComponent implements OnInit, OnDestroy {
   viewOptions: ViewType[] = ['all', 'active', 'completed'];
   
   private destroy$ = new Subject<void>();
+  private filterSubject$ = new Subject<void>();
 
   private taskService = inject(TaskService);
   private projectService = inject(ProjectService);
@@ -116,15 +130,21 @@ export class TodoComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    this.filterSubject$.complete();
   }
 
   loadData(): void {
+    this.isLoadingTasks = true;
+    this.cdr.markForCheck();
+    
     this.taskService.getTasksWithProjects()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (tasks) => {
           this.tasks = tasks;
           this.applyFilters();
+          this.isLoadingTasks = false;
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Error loading tasks:', error);
@@ -133,6 +153,8 @@ export class TodoComponent implements OnInit, OnDestroy {
             summary: 'Error',
             detail: 'Failed to load tasks. Please try again.'
           });
+          this.isLoadingTasks = false;
+          this.cdr.markForCheck();
         }
       });
 
@@ -141,6 +163,7 @@ export class TodoComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (projects) => {
           this.projects = projects;
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Error loading projects:', error);
@@ -149,16 +172,22 @@ export class TodoComponent implements OnInit, OnDestroy {
             summary: 'Error',
             detail: 'Failed to load projects. Please try again.'
           });
+          this.cdr.markForCheck();
         }
       });
   }
 
   loadStatistics(): void {
+    this.isLoadingStatistics = true;
+    this.cdr.markForCheck();
+    
     this.taskService.getTaskStatistics()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (stats) => {
           this.statistics = stats;
+          this.isLoadingStatistics = false;
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Error loading statistics:', error);
@@ -167,6 +196,8 @@ export class TodoComponent implements OnInit, OnDestroy {
             summary: 'Error',
             detail: 'Failed to load statistics. Please try again.'
           });
+          this.isLoadingStatistics = false;
+          this.cdr.markForCheck();
         }
       });
   }
@@ -231,6 +262,11 @@ export class TodoComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // Prevent rapid task creation
+    if (this.isAddingTask) {
+      return;
+    }
+
     const taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'userId'> = {
       title: this.sanitizeInput(this.newTask.title),
       description: this.sanitizeInput(this.newTask.description || ''),
@@ -239,6 +275,9 @@ export class TodoComponent implements OnInit, OnDestroy {
       dueDate: this.newTask.dueDate,
       projectId: this.newTask.projectId
     };
+
+    this.isAddingTask = true;
+    this.cdr.markForCheck();
 
     this.taskService.addTask(taskData)
       .pipe(takeUntil(this.destroy$))
@@ -251,8 +290,10 @@ export class TodoComponent implements OnInit, OnDestroy {
           });
           this.resetNewTask();
           this.showAddDialog = false;
+          this.isAddingTask = false;
           this.loadData();
           this.loadStatistics();
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Error adding task:', error);
@@ -261,17 +302,29 @@ export class TodoComponent implements OnInit, OnDestroy {
             summary: 'Error',
             detail: 'Failed to add task. Please try again.'
           });
+          this.isAddingTask = false;
+          this.cdr.markForCheck();
         }
       });
   }
 
   toggleTaskCompletion(task: Task): void {
+    // Prevent rapid toggling
+    if (this.isTogglingTask === task.id) {
+      return;
+    }
+
+    this.isTogglingTask = task.id;
+    this.cdr.markForCheck();
+
     this.taskService.toggleTaskCompletion(task.id)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
           this.loadData();
           this.loadStatistics();
+          this.isTogglingTask = null;
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Error toggling task completion:', error);
@@ -280,16 +333,26 @@ export class TodoComponent implements OnInit, OnDestroy {
             summary: 'Error',
             detail: 'Failed to update task. Please try again.'
           });
+          this.isTogglingTask = null;
+          this.cdr.markForCheck();
         }
       });
   }
 
   deleteTask(task: Task): void {
+    // Prevent rapid deletion
+    if (this.isDeletingTask) {
+      return;
+    }
+
     this.confirmationService.confirm({
       message: `Are you sure you want to delete "${task.title}"?`,
       header: 'Delete Confirmation',
       icon: 'pi pi-exclamation-triangle',
       accept: () => {
+        this.isDeletingTask = task.id;
+        this.cdr.markForCheck();
+
         this.taskService.deleteTask(task.id)
           .pipe(takeUntil(this.destroy$))
           .subscribe({
@@ -301,6 +364,8 @@ export class TodoComponent implements OnInit, OnDestroy {
               });
               this.loadData();
               this.loadStatistics();
+              this.isDeletingTask = null;
+              this.cdr.markForCheck();
             },
             error: (error) => {
               console.error('Error deleting task:', error);
@@ -309,6 +374,8 @@ export class TodoComponent implements OnInit, OnDestroy {
                 summary: 'Error',
                 detail: 'Failed to delete task. Please try again.'
               });
+              this.isDeletingTask = null;
+              this.cdr.markForCheck();
             }
           });
       }
@@ -322,7 +389,7 @@ export class TodoComponent implements OnInit, OnDestroy {
 
   setView(view: ViewType): void {
     this.selectedView = view;
-    this.applyFilters();
+    this.triggerFilterDebounce();
   }
 
   applyFilters(): void {
@@ -347,6 +414,7 @@ export class TodoComponent implements OnInit, OnDestroy {
           this.tasks = tasks;
           this.filteredTasks = tasks;
           this.groupTasksByProject();
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Error applying filters:', error);
@@ -355,6 +423,7 @@ export class TodoComponent implements OnInit, OnDestroy {
             summary: 'Error',
             detail: 'Failed to apply filters. Please try again.'
           });
+          this.cdr.markForCheck();
         }
       });
   }
@@ -456,6 +525,8 @@ export class TodoComponent implements OnInit, OnDestroy {
     }
     
     this.isSyncing = true;
+    this.cdr.markForCheck();
+    
     this.syncService.syncWithServer()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
