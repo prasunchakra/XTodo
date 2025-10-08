@@ -7,11 +7,10 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
+    "test:ci": "jest --ci --coverage",
     "netlify": "netlify",
     "dev": "netlify dev",
-    "deploy": "netlify deploy --prod",
-    "test-setup": "node test-setup.js",
-    "test-security": "node test-security-validation.js && node test-auth-validation.js && node test-sync-validation.js"
+    "deploy": "netlify deploy --prod"
   },
   "prettier": {
     "printWidth": 100,
