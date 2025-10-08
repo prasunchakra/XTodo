@@ -2,6 +2,34 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, map } from 'rxjs';
 import { Task, Project } from '../models/task';
 
+/**
+ * StorageService - Local data storage service
+ * 
+ * CURRENT IMPLEMENTATION:
+ * Uses localStorage for simple key-value storage. This works well for small datasets
+ * but has limitations:
+ * - 5-10MB storage limit (browser dependent)
+ * - Data can be cleared by user
+ * - Synchronous API can block UI thread
+ * 
+ * FUTURE ENHANCEMENTS:
+ * Consider the following improvements as the application scales:
+ * 
+ * 1. IndexedDB Migration:
+ *    - Store larger datasets without performance impact
+ *    - Asynchronous API for better UI responsiveness
+ *    - More reliable persistence (see sync.service.ts for implementation example)
+ * 
+ * 2. Error Handling:
+ *    - Add retry logic for failed storage operations
+ *    - Implement quota management to handle storage limit errors
+ *    - Provide user feedback when storage operations fail
+ * 
+ * 3. Data Consistency:
+ *    - Add versioning to handle data structure changes
+ *    - Implement migration strategies for schema updates
+ */
+
 @Injectable({
   providedIn: 'root'
 })
@@ -210,7 +238,18 @@ export class StorageService {
     try {
       localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
+      // Enhanced error handling for storage failures
       console.error('Failed to save to localStorage:', error);
+      
+      // Check for quota exceeded error
+      if (error instanceof DOMException && 
+          (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+        console.error('Storage quota exceeded. Consider clearing old data or using IndexedDB.');
+        // In a production app, you might want to:
+        // 1. Notify the user
+        // 2. Clear old/unnecessary data
+        // 3. Migrate to IndexedDB for larger storage capacity
+      }
     }
   }
 
@@ -226,7 +265,18 @@ export class StorageService {
         return this.convertDates(parsed) as T;
       }
     } catch (error) {
+      // Enhanced error handling for data corruption or parsing errors
       console.error('Failed to load from localStorage:', error);
+      
+      // If data is corrupted, clear it and use default value
+      if (error instanceof SyntaxError) {
+        console.warn(`Corrupted data found for key: ${key}, clearing and using default value`);
+        try {
+          localStorage.removeItem(key);
+        } catch (e) {
+          console.error('Failed to clear corrupted data:', e);
+        }
+      }
     }
     return defaultValue;
   }
