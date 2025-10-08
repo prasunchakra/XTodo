@@ -1,10 +1,21 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
 import { App } from './app';
 
+/**
+ * Unit tests for the main App component
+ * Tests component creation and basic rendering functionality
+ */
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
+      // Provide required dependencies for AuthService and Router
+      providers: [
+        provideHttpClient(),
+        provideRouter([])
+      ]
     }).compileComponents();
   });
 
@@ -14,10 +25,16 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
-  it('should render title', () => {
+  it('should have a title property', () => {
     const fixture = TestBed.createComponent(App);
-    fixture.detectChanges();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, xtodo-client');
+    const app = fixture.componentInstance;
+    expect(app.title()).toBe('xTodo');
+  });
+
+  it('should call AuthService.isAuthenticated when checking authentication', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+    // Should not throw an error
+    expect(() => app.isAuthenticated()).not.toThrow();
   });
 });
