@@ -277,6 +277,7 @@
               </div>
               
               <!-- Tasks in this group - Use virtual scroller for performance with large lists -->
+              <!-- Virtual scrolling renders only visible items, improving performance with 50+ tasks -->
               <p-scroller 
                 *ngIf="group.tasks.length > 20"
                 [items]="group.tasks" 
@@ -458,6 +459,7 @@
           <!-- Flat View -->
           <div *ngIf="!isLoadingTasks && !showProjectGroups">
             <!-- Use virtual scroller for large lists (50+ items) -->
+            <!-- Virtual scrolling significantly improves memory usage and rendering performance -->
             <p-scroller 
               *ngIf="filteredTasks.length > 20"
               [items]="filteredTasks" 
