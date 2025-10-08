@@ -10,7 +10,8 @@
     "netlify": "netlify",
     "dev": "netlify dev",
     "deploy": "netlify deploy --prod",
-    "test-setup": "node test-setup.js"
+    "test-setup": "node test-setup.js",
+    "test-security": "node test-security-validation.js && node test-auth-validation.js && node test-sync-validation.js"
   },
   "prettier": {
     "printWidth": 100,
@@ -46,6 +47,7 @@
     "tailwindcss": "^4.1.12",
     "tailwindcss-primeui": "^0.6.1",
     "tslib": "^2.3.0",
+    "validator": "^13.15.15",
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
