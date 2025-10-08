@@ -69,7 +69,10 @@
       min-height: 44px;
     }
     
-    /* Better touch targets for navigation */
+    /* Touch Target Optimization for Navigation (IXT09):
+     * - Ensures comfortable tap targets on mobile navigation
+     * - Improves overall mobile user experience
+     */
     .p-menuitem-link {
       min-height: 44px;
       padding: 0.75rem;
@@ -127,7 +130,11 @@
       font-size: 1.25rem;
     }
     
-    /* Ensure minimum touch target sizes */
+    /* Touch Target Optimization for Mobile (IXT09):
+     * - Ensures minimum 44px touch targets for all interactive elements
+     * - Improves tap accuracy and reduces user frustration
+     * - Follows WCAG 2.1 mobile accessibility guidelines
+     */
     .p-button, button, a {
       min-height: 44px;
       min-width: 44px;
@@ -139,7 +146,10 @@
       padding: 0.75rem 1rem;
     }
     
-    /* Form inputs optimized for mobile */
+    /* Mobile-Optimized Form Inputs (IXT09):
+     * - 16px font size prevents automatic zoom on iOS
+     * - Provides better mobile keyboard experience
+     */
     input, select, textarea {
       font-size: 16px; /* Prevents zoom on iOS */
       min-height: 44px;

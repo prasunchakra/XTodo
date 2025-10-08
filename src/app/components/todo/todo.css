@@ -143,7 +143,11 @@
     font-size: 0.75rem;
   }
   
-  /* Minimum touch target size for buttons and interactive elements */
+  /* Touch Target Optimization (IXT09):
+   * - All interactive elements have minimum 44px touch targets
+   * - Meets accessibility standards for mobile touch interactions
+   * - Reduces misclicks and improves user experience
+   */
   button, .p-button, a, .p-checkbox, input[type="checkbox"], input[type="radio"] {
     min-height: 44px;
     min-width: 44px;
@@ -155,7 +159,11 @@
     padding: 0.5rem 0.75rem;
   }
   
-  /* Form inputs optimized for mobile */
+  /* Mobile-Optimized Form Inputs (IXT09):
+   * - 16px font size prevents automatic zoom on iOS
+   * - Minimum 44px height for comfortable interaction
+   * - Proper padding for better usability
+   */
   input, select, textarea {
     min-height: 44px;
     font-size: 16px; /* Prevents zoom on iOS */
@@ -175,7 +183,10 @@
     padding: 0.5rem;
   }
   
-  /* Improve header sizing on mobile */
+  /* Responsive Typography (IXT09):
+   * - Scaled down headings for mobile screens
+   * - Maintains readability while saving space
+   */
   h1 {
     font-size: 1.875rem !important;
   }
@@ -354,6 +365,11 @@
 
 /* Responsive dialog */
 @media (max-width: 640px) {
+  /* Mobile Dialog Improvements (IXT09):
+   * - Full-width dialogs on mobile for better usability
+   * - Proper spacing and padding for mobile devices
+   * - Ensures dialogs don't overflow on small screens
+   */
   .p-dialog {
     margin: 0 1rem;
     width: calc(100vw - 2rem) !important;
@@ -371,13 +387,19 @@
 
 /* Mobile-specific improvements for medium screens */
 @media (max-width: 768px) {
-  /* Ensure buttons are large enough for touch */
+  /* Touch Target Improvements (IXT09):
+   * - Ensures all buttons meet the 44px minimum touch target size
+   * - Improves tap accuracy and user experience on tablets
+   */
   .p-button {
     min-height: 44px;
     padding: 0.75rem 1rem;
   }
   
-  /* Stack buttons vertically on mobile for easier access */
+  /* Mobile-Optimized Dialog Buttons (IXT09):
+   * - Stack buttons vertically for easier access on mobile
+   * - Full-width buttons for better touch targets
+   */
   .p-dialog-footer .flex {
     flex-direction: column-reverse;
     gap: 0.5rem;
