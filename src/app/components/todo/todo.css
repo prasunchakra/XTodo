@@ -142,6 +142,58 @@
   .stats-grid .stat-label {
     font-size: 0.75rem;
   }
+  
+  /* Minimum touch target size for buttons and interactive elements */
+  button, .p-button, a, .p-checkbox, input[type="checkbox"], input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Small buttons should still maintain touch target size with padding */
+  .p-button.p-button-sm, .p-button[size="small"] {
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  /* Form inputs optimized for mobile */
+  input, select, textarea {
+    min-height: 44px;
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 0.75rem;
+  }
+  
+  textarea {
+    min-height: 88px;
+  }
+  
+  /* Better spacing for mobile interactions */
+  .flex.space-x-2 {
+    gap: 0.75rem;
+  }
+  
+  .flex.items-center.space-x-2 button {
+    padding: 0.5rem;
+  }
+  
+  /* Improve header sizing on mobile */
+  h1 {
+    font-size: 1.875rem !important;
+  }
+  
+  h3 {
+    font-size: 1rem !important;
+  }
+  
+  /* Better card spacing on mobile */
+  .p-card {
+    margin-bottom: 1rem;
+  }
+  
+  /* Optimize task item layout for touch */
+  .task-item, .border.border-gray-200 {
+    padding: 1rem !important;
+    margin-bottom: 0.75rem;
+  }
 }
 
 /* Custom animations */
@@ -304,5 +356,46 @@
 @media (max-width: 640px) {
   .p-dialog {
     margin: 0 1rem;
+    width: calc(100vw - 2rem) !important;
+    max-width: 100%;
+  }
+  
+  .p-dialog .p-dialog-content {
+    padding: 1rem;
+  }
+  
+  .p-dialog .p-dialog-footer {
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* Mobile-specific improvements for medium screens */
+@media (max-width: 768px) {
+  /* Ensure buttons are large enough for touch */
+  .p-button {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+  }
+  
+  /* Stack buttons vertically on mobile for easier access */
+  .p-dialog-footer .flex {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+  
+  .p-dialog-footer button {
+    width: 100%;
+  }
+  
+  /* Improve filter sidebar on tablets */
+  .lg\:col-span-1 {
+    margin-bottom: 1.5rem;
+  }
+  
+  /* Better touch targets for action buttons */
+  .p-button-text {
+    padding: 0.5rem;
+    min-width: 44px;
+    min-height: 44px;
   }
 }

@@ -135,6 +135,17 @@
     grid-template-columns: repeat(1, 1fr);
     gap: 1rem;
   }
+  
+  /* Ensure proper touch targets on tablets */
+  .p-button {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+  }
+  
+  /* Better spacing for project cards */
+  .p-card {
+    margin-bottom: 1rem;
+  }
 }
 
 @media (max-width: 1024px) {
@@ -405,6 +416,69 @@
   
   .stat-label {
     font-size: 0.75rem;
+  }
+  
+  /* Minimum touch target size for mobile */
+  button, .p-button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Form inputs optimized for mobile */
+  input, select, textarea {
+    min-height: 44px;
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 0.75rem;
+  }
+  
+  textarea {
+    min-height: 88px;
+  }
+  
+  /* Better card footer button spacing */
+  .p-card .p-card-footer {
+    padding: 1rem;
+  }
+  
+  .p-card-footer button {
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  /* Improve header sizing on mobile */
+  h1 {
+    font-size: 1.875rem !important;
+  }
+  
+  /* Color preset touch targets */
+  .w-8.h-8 {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  /* Dialog improvements */
+  .p-dialog {
+    margin: 0 1rem;
+    width: calc(100vw - 2rem) !important;
+    max-width: 100%;
+  }
+  
+  .p-dialog .p-dialog-content {
+    padding: 1rem;
+  }
+  
+  .p-dialog .p-dialog-footer {
+    padding: 0.75rem 1rem;
+  }
+  
+  /* Stack dialog buttons vertically */
+  .p-dialog-footer .flex {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+  
+  .p-dialog-footer button {
+    width: 100%;
   }
 }
 

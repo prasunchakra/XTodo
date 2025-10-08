@@ -66,6 +66,13 @@
     .p-menubar .p-menubar-end .p-button {
       width: 100%;
       justify-content: center;
+      min-height: 44px;
+    }
+    
+    /* Better touch targets for navigation */
+    .p-menuitem-link {
+      min-height: 44px;
+      padding: 0.75rem;
     }
   }
   
@@ -118,6 +125,24 @@
     
     .app-logo i {
       font-size: 1.25rem;
+    }
+    
+    /* Ensure minimum touch target sizes */
+    .p-button, button, a {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    
+    /* Navigation items should be easily tappable */
+    .p-menuitem-link {
+      min-height: 44px;
+      padding: 0.75rem 1rem;
+    }
+    
+    /* Form inputs optimized for mobile */
+    input, select, textarea {
+      font-size: 16px; /* Prevents zoom on iOS */
+      min-height: 44px;
     }
   }
   

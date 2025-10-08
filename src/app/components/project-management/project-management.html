@@ -166,6 +166,7 @@
           (input)="validateProjectName(false)"
           [class.ng-invalid]="projectNameError"
           [class.ng-dirty]="projectNameError"
+          autocomplete="off"
           class="w-full"
           maxlength="100"
         />
@@ -189,6 +190,7 @@
           [class.ng-invalid]="projectDescriptionError"
           [class.ng-dirty]="projectDescriptionError"
           [rows]="3"
+          autocomplete="off"
           class="w-full"
           maxlength="500"
         ></textarea>
@@ -263,6 +265,7 @@
           (input)="validateProjectName(true)"
           [class.ng-invalid]="projectNameError"
           [class.ng-dirty]="projectNameError"
+          autocomplete="off"
           class="w-full"
           maxlength="100"
         />
@@ -286,6 +289,7 @@
           [class.ng-invalid]="projectDescriptionError"
           [class.ng-dirty]="projectDescriptionError"
           [rows]="3"
+          autocomplete="off"
           class="w-full"
           maxlength="500"
         ></textarea>
