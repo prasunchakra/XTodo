@@ -1,9 +1,9 @@
 <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 font-sans">
   <div class="container mx-auto px-6 py-16 lg:py-24">
-    <div class="flex items-center justify-center mb-12 lg:mb-16">
+    <header class="flex items-center justify-center mb-12 lg:mb-16">
       <img src="/logo.png" alt="xTodo Logo" class="h-12 w-12 object-contain mr-4">
       <h1 class="text-4xl font-bold text-gray-800 tracking-tight">xTodo</h1>
-    </div>
+    </header>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-center">
       <div class="text-center lg:text-left">
@@ -19,8 +19,8 @@
         <div class="space-y-6">
           <div class="flex items-start">
             <div class="flex-shrink-0">
-              <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-slate-800 text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-slate-800 text-white" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
               </div>
@@ -32,8 +32,8 @@
           </div>
           <div class="flex items-start">
             <div class="flex-shrink-0">
-              <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-slate-800 text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-slate-800 text-white" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
@@ -45,8 +45,8 @@
           </div>
           <div class="flex items-start">
             <div class="flex-shrink-0">
-              <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-slate-800 text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-slate-800 text-white" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M4 4l1.5 1.5A9 9 0 0120.5 18M20 20l-1.5-1.5A9 9 0 003.5 6" />
                 </svg>
               </div>
@@ -70,45 +70,45 @@
 
           <div class="p-6 sm:p-8">
             <div class="flex justify-center mb-6">
-              <div class="inline-flex rounded-lg bg-gray-100 p-1">
-                <button pButton (click)="mode.set('signin')" [text]="mode() !== 'signin'" [raised]="mode() === 'signin'" label="Sign In" class="p-button-sm !px-6" [ngClass]="{'p-button-secondary !shadow-md': mode() === 'signin'}"></button>
-                <button pButton (click)="mode.set('signup')" [text]="mode() !== 'signup'" [raised]="mode() === 'signup'" label="Sign Up" class="p-button-sm !px-6" [ngClass]="{'p-button-secondary !shadow-md': mode() === 'signup'}"></button>
+              <div class="inline-flex rounded-lg bg-gray-100 p-1" role="tablist" aria-label="Authentication mode">
+                <button pButton (click)="mode.set('signin')" [text]="mode() !== 'signin'" [raised]="mode() === 'signin'" label="Sign In" class="p-button-sm !px-6" [ngClass]="{'p-button-secondary !shadow-md': mode() === 'signin'}" role="tab" [attr.aria-selected]="mode() === 'signin'" [attr.aria-label]="'Sign in mode'"></button>
+                <button pButton (click)="mode.set('signup')" [text]="mode() !== 'signup'" [raised]="mode() === 'signup'" label="Sign Up" class="p-button-sm !px-6" [ngClass]="{'p-button-secondary !shadow-md': mode() === 'signup'}" role="tab" [attr.aria-selected]="mode() === 'signup'" [attr.aria-label]="'Sign up mode'"></button>
               </div>
             </div>
 
-            <form class="space-y-4">
+            <form class="space-y-4" [attr.aria-label]="mode() === 'signin' ? 'Sign in form' : 'Sign up form'">
               @if (mode() === 'signin') {
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input pInputText type="email" name="email" [ngModel]="email()" (ngModelChange)="email.set($event)" class="w-full" placeholder="you@example.com" />
+                  <label for="signin-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input pInputText type="email" id="signin-email" name="email" [ngModel]="email()" (ngModelChange)="email.set($event)" class="w-full" placeholder="you@example.com" autocomplete="email" aria-required="true" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                  <input pInputText type="password" name="password" [ngModel]="password()" (ngModelChange)="password.set($event)" class="w-full" placeholder="••••••••" />
+                  <label for="signin-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <input pInputText type="password" id="signin-password" name="password" [ngModel]="password()" (ngModelChange)="password.set($event)" class="w-full" placeholder="••••••••" autocomplete="current-password" aria-required="true" />
                 </div>
 
                 @if (error()) {
-                  <div class="text-red-600 text-sm pt-1">{{ error() }}</div>
+                  <div class="text-red-600 text-sm pt-1" role="alert" aria-live="polite">{{ error() }}</div>
                 }
 
-                <button pButton class="w-full !mt-6 !bg-slate-900 !border-slate-900" [loading]="loading()" (click)="signin()" label="Sign In"></button>
+                <button pButton type="submit" class="w-full !mt-6 !bg-slate-900 !border-slate-900" [loading]="loading()" (click)="signin()" label="Sign In" aria-label="Sign in to your account"></button>
               } @else {
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Full name</label>
-                  <input pInputText type="text" name="fullName" [ngModel]="fullName()" (ngModelChange)="fullName.set($event)" class="w-full" placeholder="John Doe" />
+                  <label for="signup-fullname" class="block text-sm font-medium text-gray-700 mb-1">Full name</label>
+                  <input pInputText type="text" id="signup-fullname" name="fullName" [ngModel]="fullName()" (ngModelChange)="fullName.set($event)" class="w-full" placeholder="John Doe" autocomplete="name" aria-required="true" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input pInputText type="email" name="email" [ngModel]="email()" (ngModelChange)="email.set($event)" class="w-full" placeholder="you@example.com" />
+                  <label for="signup-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input pInputText type="email" id="signup-email" name="email" [ngModel]="email()" (ngModelChange)="email.set($event)" class="w-full" placeholder="you@example.com" autocomplete="email" aria-required="true" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                  <input pInputText type="password" name="password" [ngModel]="password()" (ngModelChange)="password.set($event)" class="w-full" placeholder="••••••••" />
+                  <label for="signup-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <input pInputText type="password" id="signup-password" name="password" [ngModel]="password()" (ngModelChange)="password.set($event)" class="w-full" placeholder="••••••••" autocomplete="new-password" aria-required="true" />
                 </div>
                 @if (error()) {
-                  <div class="text-red-600 text-sm pt-1">{{ error() }}</div>
+                  <div class="text-red-600 text-sm pt-1" role="alert" aria-live="polite">{{ error() }}</div>
                 }
-                <button pButton class="w-full !mt-6 !bg-slate-900 !border-slate-900" [loading]="loading()" (click)="signup()" label="Create Account"></button>
+                <button pButton type="submit" class="w-full !mt-6 !bg-slate-900 !border-slate-900" [loading]="loading()" (click)="signup()" label="Create Account" aria-label="Create a new account"></button>
               }
             </form>
           </div>
