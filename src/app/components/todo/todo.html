@@ -294,14 +294,14 @@
                     <div class="flex items-start justify-between">
                       <div class="flex-1">
                         <h3 
-                          [class]="'text-lg font-medium ' + (task.completed ? 'line-through text-gray-500' : 'text-gray-900')"
+                          [class]="'text-lg font-medium task-title ' + (task.completed ? 'line-through text-gray-500' : 'text-gray-900')"
                         >
                           {{ task.title }}
                         </h3>
                         
                         <p 
                           *ngIf="task.description"
-                          [class]="'text-sm mt-1 ' + (task.completed ? 'text-gray-400' : 'text-gray-600')"
+                          [class]="'text-sm mt-1 task-description ' + (task.completed ? 'text-gray-400' : 'text-gray-600')"
                         >
                           {{ task.description }}
                         </p>
