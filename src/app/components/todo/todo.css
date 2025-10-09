@@ -142,6 +142,69 @@
   .stats-grid .stat-label {
     font-size: 0.75rem;
   }
+  
+  /* Touch Target Optimization (IXT09):
+   * - All interactive elements have minimum 44px touch targets
+   * - Meets accessibility standards for mobile touch interactions
+   * - Reduces misclicks and improves user experience
+   */
+  button, .p-button, a, .p-checkbox, input[type="checkbox"], input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Small buttons should still maintain touch target size with padding */
+  .p-button.p-button-sm, .p-button[size="small"] {
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  /* Mobile-Optimized Form Inputs (IXT09):
+   * - 16px font size prevents automatic zoom on iOS
+   * - Minimum 44px height for comfortable interaction
+   * - Proper padding for better usability
+   */
+  input, select, textarea {
+    min-height: 44px;
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 0.75rem;
+  }
+  
+  textarea {
+    min-height: 88px;
+  }
+  
+  /* Better spacing for mobile interactions */
+  .flex.space-x-2 {
+    gap: 0.75rem;
+  }
+  
+  .flex.items-center.space-x-2 button {
+    padding: 0.5rem;
+  }
+  
+  /* Responsive Typography (IXT09):
+   * - Scaled down headings for mobile screens
+   * - Maintains readability while saving space
+   */
+  h1 {
+    font-size: 1.875rem !important;
+  }
+  
+  h3 {
+    font-size: 1rem !important;
+  }
+  
+  /* Better card spacing on mobile */
+  .p-card {
+    margin-bottom: 1rem;
+  }
+  
+  /* Optimize task item layout for touch */
+  .task-item, .border.border-gray-200 {
+    padding: 1rem !important;
+    margin-bottom: 0.75rem;
+  }
 }
 
 /* Custom animations */
@@ -302,7 +365,59 @@
 
 /* Responsive dialog */
 @media (max-width: 640px) {
+  /* Mobile Dialog Improvements (IXT09):
+   * - Full-width dialogs on mobile for better usability
+   * - Proper spacing and padding for mobile devices
+   * - Ensures dialogs don't overflow on small screens
+   */
   .p-dialog {
     margin: 0 1rem;
+    width: calc(100vw - 2rem) !important;
+    max-width: 100%;
+  }
+  
+  .p-dialog .p-dialog-content {
+    padding: 1rem;
+  }
+  
+  .p-dialog .p-dialog-footer {
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* Mobile-specific improvements for medium screens */
+@media (max-width: 768px) {
+  /* Touch Target Improvements (IXT09):
+   * - Ensures all buttons meet the 44px minimum touch target size
+   * - Improves tap accuracy and user experience on tablets
+   */
+  .p-button {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+  }
+  
+  /* Mobile-Optimized Dialog Buttons (IXT09):
+   * - Stack buttons vertically for easier access on mobile
+   * - Full-width buttons for better touch targets
+   */
+  .p-dialog-footer .flex {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+  
+  .p-dialog-footer button {
+    width: 100%;
+  }
+  
+  /* Improve filter sidebar on tablets */
+  .lg\:col-span-1 {
+    margin-bottom: 1.5rem;
+  }
+  
+  /* Better touch targets for action buttons */
+  .p-button-text {
+    padding: 0.5rem;
+    min-width: 44px;
+    min-height: 44px;
   }
 }

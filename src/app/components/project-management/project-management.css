@@ -135,6 +135,20 @@
     grid-template-columns: repeat(1, 1fr);
     gap: 1rem;
   }
+  
+  /* Touch Target Optimization for Tablets (IXT09):
+   * - Ensures proper touch target sizes on tablet devices
+   * - Improves usability across all mobile form factors
+   */
+  .p-button {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+  }
+  
+  /* Better spacing for project cards */
+  .p-card {
+    margin-bottom: 1rem;
+  }
 }
 
 @media (max-width: 1024px) {
@@ -405,6 +419,87 @@
   
   .stat-label {
     font-size: 0.75rem;
+  }
+  
+  /* Touch Target Optimization (IXT09):
+   * - All interactive elements have minimum 44px touch targets
+   * - Ensures comfortable interaction on mobile devices
+   * - Follows accessibility best practices
+   */
+  button, .p-button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Mobile-Optimized Form Inputs (IXT09):
+   * - 16px font size prevents automatic zoom on iOS devices
+   * - Minimum 44px height for easy interaction
+   * - Proper padding for better touch accuracy
+   */
+  input, select, textarea {
+    min-height: 44px;
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 0.75rem;
+  }
+  
+  textarea {
+    min-height: 88px;
+  }
+  
+  /* Better card footer button spacing */
+  .p-card .p-card-footer {
+    padding: 1rem;
+  }
+  
+  .p-card-footer button {
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  /* Improve header sizing on mobile */
+  h1 {
+    font-size: 1.875rem !important;
+  }
+  
+  /* Color Preset Touch Targets (IXT09):
+   * - Expanded touch targets for color selection
+   * - Makes it easier to select colors on mobile
+   */
+  .w-8.h-8 {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  /* Mobile Dialog Optimization (IXT09):
+   * - Full-width dialogs on mobile for better usability
+   * - Prevents content overflow on small screens
+   * - Proper padding and spacing
+   */
+  .p-dialog {
+    margin: 0 1rem;
+    width: calc(100vw - 2rem) !important;
+    max-width: 100%;
+  }
+  
+  .p-dialog .p-dialog-content {
+    padding: 1rem;
+  }
+  
+  .p-dialog .p-dialog-footer {
+    padding: 0.75rem 1rem;
+  }
+  
+  /* Mobile-Optimized Dialog Buttons (IXT09):
+   * - Stack buttons vertically for easier access
+   * - Full-width buttons improve touch accuracy
+   */
+  .p-dialog-footer .flex {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+  
+  .p-dialog-footer button {
+    width: 100%;
   }
 }
 
