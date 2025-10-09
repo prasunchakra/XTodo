@@ -1,10 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
-import { catchError, map, tap } from 'rxjs/operators';
+import { catchError, map, tap, finalize } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { Task, Project } from '../models/task';
 import { AuthService } from './auth.service';
+
+const DB_NAME = 'XTodoOfflineDB';
+const DB_VERSION = 1;
+const PENDING_CHANGES_STORE = 'pendingChanges';
 
 interface SyncData {
   tasks: Task[];
@@ -39,9 +43,51 @@ export class SyncService {
   private http = inject(HttpClient);
   private authService = inject(AuthService);
 
+  // Sync lock to prevent race conditions
+  // Ensures only one sync operation runs at a time
+  private isSyncInProgress = false;
+  private syncQueue: (() => void)[] = [];
+
+  // IndexedDB instance for persistent storage
+  private db: IDBDatabase | null = null;
+
   constructor() {
-    this.loadFromStorage();
-    this.loadPendingChanges();
+    this.initIndexedDB().then(() => {
+      this.loadFromStorage();
+      this.loadPendingChanges();
+    });
+  }
+
+  
+  private async initIndexedDB(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+      request.onerror = () => {
+        console.error('Failed to open IndexedDB, falling back to localStorage');
+        resolve(); // Continue even if IndexedDB fails
+      };
+
+      request.onsuccess = (event) => {
+        this.db = (event.target as IDBOpenDBRequest).result;
+        resolve();
+      };
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        
+        // Create object store for pending changes if it doesn't exist
+        if (!db.objectStoreNames.contains(PENDING_CHANGES_STORE)) {
+          const objectStore = db.createObjectStore(PENDING_CHANGES_STORE, { 
+            keyPath: 'id', 
+            autoIncrement: true 
+          });
+          // Create index for userId to support multi-user scenarios
+          objectStore.createIndex('userId', 'userId', { unique: false });
+          objectStore.createIndex('timestamp', 'timestamp', { unique: false });
+        }
+      };
+    });
   }
 
   // Get user-specific storage keys
@@ -97,7 +143,25 @@ export class SyncService {
   }
 
   // Sync all data with server
+  // Uses locking mechanism to prevent race conditions
   syncWithServer(): Observable<ServerResponse> {
+    // Check if sync is already in progress
+    if (this.isSyncInProgress) {
+      console.log('Sync already in progress, operation will be queued');
+      return new Observable(observer => {
+        this.syncQueue.push(() => {
+          this.performSync().subscribe(observer);
+        });
+      });
+    }
+
+    return this.performSync();
+  }
+
+
+  private performSync(): Observable<ServerResponse> {
+    this.isSyncInProgress = true;
+
     const lastSync = this.getLastSync();
     const pendingChanges = this.getPendingChanges();
     
@@ -123,8 +187,23 @@ export class SyncService {
       catchError(error => {
         console.error('Sync failed:', error);
         return throwError(() => error);
+      }),
+      finalize(() => {
+        // Release the lock and process queued sync operations
+        this.isSyncInProgress = false;
+        this.processNextQueuedSync();
       })
     );
+  }
+
+
+  private processNextQueuedSync(): void {
+    if (this.syncQueue.length > 0) {
+      const nextSync = this.syncQueue.shift();
+      if (nextSync) {
+        nextSync();
+      }
+    }
   }
 
   // Get all data (from local storage)
@@ -342,37 +421,237 @@ export class SyncService {
       localStorage.setItem(keys.TASKS_KEY, JSON.stringify(this.tasksSubject.value));
       localStorage.setItem(keys.PROJECTS_KEY, JSON.stringify(this.projectsSubject.value));
     } catch (error) {
+      // Enhanced error handling - storage failures shouldn't crash the app
       console.error('Error saving to storage:', error);
+      
+      // Check for quota exceeded error
+      if (error instanceof DOMException && 
+          (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+        console.error('Storage quota exceeded. Data is still available in memory but may be lost on refresh.');
+        // The data is still in memory (BehaviorSubjects), so the app continues to work
+        // but persistence is compromised until the issue is resolved
+      }
     }
   }
 
-  private loadPendingChanges(): void {
+  /**
+   * Load pending changes from IndexedDB with localStorage fallback
+   * Migrates data from localStorage to IndexedDB if found
+   */
+  private async loadPendingChanges(): Promise<void> {
     try {
+      const user = this.authService.getCurrentUserSnapshot();
+      const userId = user?.id || 'anonymous';
+
+      // Try loading from IndexedDB first
+      if (this.db) {
+        const changes = await this.getFromIndexedDB(userId);
+        if (changes && changes.length > 0) {
+          this.pendingChangesSubject.next(changes);
+          return;
+        }
+      }
+
+      // Fallback to localStorage and migrate to IndexedDB
       const keys = this.getStorageKeys();
-      const pending = JSON.parse(localStorage.getItem(keys.PENDING_CHANGES_KEY) || '[]');
-      this.pendingChangesSubject.next(pending);
+      const localStorageData = localStorage.getItem(keys.PENDING_CHANGES_KEY);
+      
+      if (localStorageData) {
+        const pending = JSON.parse(localStorageData);
+        this.pendingChangesSubject.next(pending);
+        
+        // Migrate to IndexedDB for better persistence
+        if (this.db && pending.length > 0) {
+          await this.saveToIndexedDB(userId, pending);
+          // Clear from localStorage after successful migration
+          localStorage.removeItem(keys.PENDING_CHANGES_KEY);
+        }
+      } else {
+        this.pendingChangesSubject.next([]);
+      }
     } catch (error) {
       console.error('Error loading pending changes:', error);
+      this.pendingChangesSubject.next([]);
     }
+  }
+
+  /**
+   * Get pending changes from IndexedDB for a specific user
+   */
+  private getFromIndexedDB(userId: string): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve([]);
+        return;
+      }
+
+      try {
+        const transaction = this.db.transaction([PENDING_CHANGES_STORE], 'readonly');
+        const objectStore = transaction.objectStore(PENDING_CHANGES_STORE);
+        const index = objectStore.index('userId');
+        const request = index.getAll(userId);
+
+        request.onsuccess = () => {
+          const results = request.result || [];
+          // Extract the actual change data (remove IndexedDB metadata)
+          const changes = results.map((item: any) => ({
+            type: item.type,
+            action: item.action,
+            data: item.data,
+            timestamp: item.timestamp
+          }));
+          resolve(changes);
+        };
+
+        request.onerror = () => {
+          console.error('Failed to load from IndexedDB');
+          resolve([]);
+        };
+      } catch (error) {
+        console.error('Error in getFromIndexedDB:', error);
+        resolve([]);
+      }
+    });
+  }
+
+  /**
+   * Save pending changes to IndexedDB
+   */
+  private async saveToIndexedDB(userId: string, changes: any[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve();
+        return;
+      }
+
+      try {
+        const transaction = this.db.transaction([PENDING_CHANGES_STORE], 'readwrite');
+        const objectStore = transaction.objectStore(PENDING_CHANGES_STORE);
+
+        // Clear existing entries for this user first
+        const index = objectStore.index('userId');
+        const clearRequest = index.openCursor(IDBKeyRange.only(userId));
+        
+        clearRequest.onsuccess = (event) => {
+          const cursor = (event.target as IDBRequest).result;
+          if (cursor) {
+            cursor.delete();
+            cursor.continue();
+          } else {
+            // Add new entries
+            changes.forEach(change => {
+              objectStore.add({
+                userId,
+                type: change.type,
+                action: change.action,
+                data: change.data,
+                timestamp: change.timestamp
+              });
+            });
+          }
+        };
+
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => {
+          console.error('Failed to save to IndexedDB');
+          resolve(); // Don't fail, fallback to localStorage
+        };
+      } catch (error) {
+        console.error('Error in saveToIndexedDB:', error);
+        resolve();
+      }
+    });
+  }
+
+  /**
+   * Clear specific pending changes from IndexedDB
+   */
+  private async clearFromIndexedDB(userId: string, confirmedIds: Set<string>): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve();
+        return;
+      }
+
+      try {
+        const transaction = this.db.transaction([PENDING_CHANGES_STORE], 'readwrite');
+        const objectStore = transaction.objectStore(PENDING_CHANGES_STORE);
+        const index = objectStore.index('userId');
+        const request = index.openCursor(IDBKeyRange.only(userId));
+
+        request.onsuccess = (event) => {
+          const cursor = (event.target as IDBRequest).result;
+          if (cursor) {
+            const change = cursor.value;
+            if (confirmedIds.has(change.data?.id)) {
+              cursor.delete();
+            }
+            cursor.continue();
+          }
+        };
+
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => {
+          console.error('Failed to clear from IndexedDB');
+          resolve();
+        };
+      } catch (error) {
+        console.error('Error in clearFromIndexedDB:', error);
+        resolve();
+      }
+    });
   }
 
   private getPendingChanges(): any[] {
     return this.pendingChangesSubject.value;
   }
 
+  /**
+   * Add a pending change to the queue
+   * Uses IndexedDB for persistence with localStorage fallback
+   */
   private addPendingChange(type: 'task' | 'project', action: 'create' | 'update' | 'delete', data: any): void {
     const pending = [...this.pendingChangesSubject.value];
-    pending.push({
+    const newChange = {
       type,
       action,
       data: { ...data, _action: action },
       timestamp: new Date().toISOString()
-    });
+    };
+    pending.push(newChange);
     this.pendingChangesSubject.next(pending);
-    const keys = this.getStorageKeys();
-    localStorage.setItem(keys.PENDING_CHANGES_KEY, JSON.stringify(pending));
+
+    // Save to IndexedDB
+    const user = this.authService.getCurrentUserSnapshot();
+    const userId = user?.id || 'anonymous';
+    
+    if (this.db) {
+      this.saveToIndexedDB(userId, pending).catch(error => {
+        console.error('Failed to save to IndexedDB, using localStorage fallback:', error);
+        this.savePendingToLocalStorage(pending);
+      });
+    } else {
+      // Fallback to localStorage
+      this.savePendingToLocalStorage(pending);
+    }
   }
 
+  /**
+   * Fallback method to save pending changes to localStorage
+   */
+  private savePendingToLocalStorage(pending: any[]): void {
+    const keys = this.getStorageKeys();
+    try {
+      localStorage.setItem(keys.PENDING_CHANGES_KEY, JSON.stringify(pending));
+    } catch (error) {
+      console.error('Failed to save to localStorage:', error);
+    }
+  }
+
+  /**
+   * Clear confirmed changes from the pending queue
+   * Updates both IndexedDB and in-memory state
+   */
   private clearConfirmedChanges(confirmed: any): void {
     // Remove confirmed changes from pending
     const pending = this.pendingChangesSubject.value;
@@ -383,8 +662,23 @@ export class SyncService {
     
     const remaining = pending.filter(change => !confirmedIds.has(change.data.id));
     this.pendingChangesSubject.next(remaining);
-    const keys = this.getStorageKeys();
-    localStorage.setItem(keys.PENDING_CHANGES_KEY, JSON.stringify(remaining));
+
+    // Update IndexedDB
+    const user = this.authService.getCurrentUserSnapshot();
+    const userId = user?.id || 'anonymous';
+    
+    if (this.db) {
+      this.clearFromIndexedDB(userId, confirmedIds).then(() => {
+        // Save updated state to IndexedDB
+        return this.saveToIndexedDB(userId, remaining);
+      }).catch(error => {
+        console.error('Failed to update IndexedDB, using localStorage fallback:', error);
+        this.savePendingToLocalStorage(remaining);
+      });
+    } else {
+      // Fallback to localStorage
+      this.savePendingToLocalStorage(remaining);
+    }
   }
 
   private updateLocalData(serverData: { tasks: Task[]; projects: Project[] }): void {
