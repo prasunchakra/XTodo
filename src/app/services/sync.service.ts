@@ -6,30 +6,6 @@ import { environment } from '../../environments/environment';
 import { Task, Project } from '../models/task';
 import { AuthService } from './auth.service';
 
-/**
- * STATE MANAGEMENT CONSIDERATIONS:
- * 
- * This service currently uses RxJS BehaviorSubjects for state management.
- * For larger applications, consider migrating to a dedicated state management library:
- * 
- * - NgRx: Redux-inspired state management with strong typing and DevTools support
- *   Benefits: Time-travel debugging, predictable state changes, excellent for complex apps
- *   
- * - Akita: Simplified state management with less boilerplate than NgRx
- *   Benefits: Easier learning curve, good TypeScript support, less ceremony
- * 
- * Migration path:
- * 1. Create store/state models for Tasks and Projects
- * 2. Convert service methods to actions/effects
- * 3. Update components to select from store instead of subscribing to service observables
- * 4. Maintain the same IndexedDB persistence layer
- */
-
-/**
- * IndexedDB Configuration
- * Using IndexedDB instead of localStorage for better reliability and persistence.
- * IndexedDB data persists even when localStorage is cleared by the user.
- */
 const DB_NAME = 'XTodoOfflineDB';
 const DB_VERSION = 1;
 const PENDING_CHANGES_STORE = 'pendingChanges';
@@ -82,10 +58,7 @@ export class SyncService {
     });
   }
 
-  /**
-   * Initialize IndexedDB for persistent offline storage
-   * This provides more reliable storage than localStorage
-   */
+  
   private async initIndexedDB(): Promise<void> {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -185,10 +158,7 @@ export class SyncService {
     return this.performSync();
   }
 
-  /**
-   * Internal method to perform the actual sync operation
-   * Protected by the sync lock to prevent race conditions
-   */
+
   private performSync(): Observable<ServerResponse> {
     this.isSyncInProgress = true;
 
@@ -226,9 +196,7 @@ export class SyncService {
     );
   }
 
-  /**
-   * Process the next queued sync operation if any
-   */
+
   private processNextQueuedSync(): void {
     if (this.syncQueue.length > 0) {
       const nextSync = this.syncQueue.shift();
