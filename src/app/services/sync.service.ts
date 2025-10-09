@@ -28,6 +28,31 @@ interface ServerResponse {
   newLastSync: string;
 }
 
+// Sync status type for better tracking
+export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
+
+// Online status tracking
+export interface OnlineStatus {
+  isOnline: boolean;
+  lastChecked: Date;
+}
+
+// Detailed pending changes summary
+export interface PendingChangesSummary {
+  total: number;
+  tasks: {
+    create: number;
+    update: number;
+    delete: number;
+  };
+  projects: {
+    create: number;
+    update: number;
+    delete: number;
+  };
+  changes: any[]; // Full list of changes for detailed view
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -35,10 +60,21 @@ export class SyncService {
   private tasksSubject = new BehaviorSubject<Task[]>([]);
   private projectsSubject = new BehaviorSubject<Project[]>([]);
   private pendingChangesSubject = new BehaviorSubject<any[]>([]);
+  // New: Sync status tracking
+  private syncStatusSubject = new BehaviorSubject<SyncStatus>('idle');
+  private lastSyncTimeSubject = new BehaviorSubject<Date | null>(null);
+  private onlineStatusSubject = new BehaviorSubject<OnlineStatus>({ 
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true, 
+    lastChecked: new Date() 
+  });
 
   public tasks$ = this.tasksSubject.asObservable();
   public projects$ = this.projectsSubject.asObservable();
   public pendingChanges$ = this.pendingChangesSubject.asObservable();
+  // New: Observable for sync status
+  public syncStatus$ = this.syncStatusSubject.asObservable();
+  public lastSyncTime$ = this.lastSyncTimeSubject.asObservable();
+  public onlineStatus$ = this.onlineStatusSubject.asObservable();
 
   private http = inject(HttpClient);
   private authService = inject(AuthService);
@@ -165,6 +201,9 @@ export class SyncService {
     const lastSync = this.getLastSync();
     const pendingChanges = this.getPendingChanges();
     
+    // Update sync status to syncing
+    this.syncStatusSubject.next('syncing');
+    
     // Group pending changes by type
     const clientTasks = pendingChanges.filter(change => change.type === 'task');
     const clientProjects = pendingChanges.filter(change => change.type === 'project');
@@ -183,9 +222,17 @@ export class SyncService {
         
         // Update last sync timestamp
         this.setLastSync(response.newLastSync);
+        
+        // Update sync status to success
+        this.syncStatusSubject.next('success');
+        
+        // Update last sync time for display
+        this.lastSyncTimeSubject.next(new Date());
       }),
       catchError(error => {
         console.error('Sync failed:', error);
+        // Update sync status to error
+        this.syncStatusSubject.next('error');
         return throwError(() => error);
       }),
       finalize(() => {
@@ -711,9 +758,70 @@ export class SyncService {
   private setLastSync(timestamp: string): void {
     const keys = this.getStorageKeys();
     localStorage.setItem(keys.LAST_SYNC_KEY, timestamp);
+    this.lastSyncTimeSubject.next(new Date(timestamp));
   }
 
   private generateId(): string {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  }
+
+  // Data backup/export functionality - Export all data as JSON
+  // Usage: Users can manually trigger this to backup their data
+  // This helps mitigate data loss risk from localStorage being cleared
+  exportData(): { tasks: Task[]; projects: Project[]; pendingChanges: any[]; exportDate: string } {
+    return {
+      tasks: this.tasksSubject.value,
+      projects: this.projectsSubject.value,
+      pendingChanges: this.pendingChangesSubject.value,
+      exportDate: new Date().toISOString()
+    };
+  }
+
+  // Import data from backup - Restores data from exported JSON
+  // Usage: Users can restore data if localStorage is cleared
+  // This merges imported data with existing data to prevent overwrites
+  importData(data: { tasks: Task[]; projects: Project[]; pendingChanges?: any[] }): void {
+    try {
+      // Convert date strings to Date objects
+      const processedTasks = data.tasks.map((task: any) => ({
+        ...task,
+        createdAt: new Date(task.createdAt),
+        updatedAt: new Date(task.updatedAt),
+        dueDate: task.dueDate ? new Date(task.dueDate) : undefined
+      }));
+
+      const processedProjects = data.projects.map((project: any) => ({
+        ...project,
+        createdAt: new Date(project.createdAt),
+        updatedAt: new Date(project.updatedAt)
+      }));
+
+      // Merge with existing data (avoid duplicates by ID)
+      const existingTasks = this.tasksSubject.value;
+      const existingProjects = this.projectsSubject.value;
+      
+      const taskMap = new Map(existingTasks.map(t => [t.id, t]));
+      processedTasks.forEach(t => taskMap.set(t.id, t));
+      
+      const projectMap = new Map(existingProjects.map(p => [p.id, p]));
+      processedProjects.forEach(p => projectMap.set(p.id, p));
+
+      this.tasksSubject.next(Array.from(taskMap.values()));
+      this.projectsSubject.next(Array.from(projectMap.values()));
+      
+      // Import pending changes if available
+      if (data.pendingChanges) {
+        const existingPending = this.pendingChangesSubject.value;
+        const allPending = [...existingPending, ...data.pendingChanges];
+        this.pendingChangesSubject.next(allPending);
+        const keys = this.getStorageKeys();
+        localStorage.setItem(keys.PENDING_CHANGES_KEY, JSON.stringify(allPending));
+      }
+      
+      this.saveToStorage();
+    } catch (error) {
+      console.error('Error importing data:', error);
+      throw error;
+    }
   }
 }

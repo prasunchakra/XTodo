@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -22,7 +22,7 @@ import { TooltipModule } from 'primeng/tooltip';
 // Services and Models
 import { TaskService } from '../../services/task';
 import { ProjectService } from '../../services/project.service';
-import { SyncService } from '../../services/sync.service';
+import { SyncService, SyncStatus, PendingChangesSummary } from '../../services/sync.service';
 import { Task, Project, TaskFilters } from '../../models/task';
 
 type ViewType = 'all' | 'active' | 'completed';
@@ -59,7 +59,12 @@ export class TodoComponent implements OnInit, OnDestroy {
   statistics: any = {};
   isSyncing = false;
   pendingChanges = 0;
+  pendingChangesSummary: PendingChangesSummary | null = null;
   showProjectGroups = true;
+  syncStatus: SyncStatus = 'idle';
+  lastSyncTime: Date | null = null;
+  isOnline = true;
+  showPendingDetailsDialog = false;
   
   // Form data
   newTask: Partial<Task> = {
@@ -97,11 +102,15 @@ export class TodoComponent implements OnInit, OnDestroy {
   private syncService = inject(SyncService);
   private confirmationService = inject(ConfirmationService);
   private messageService = inject(MessageService);
+  private cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {
     this.loadData();
     this.loadStatistics();
     this.subscribeToPendingChanges();
+    this.subscribeToSyncStatus();
+    this.subscribeToOnlineStatus();
+    this.subscribeToLastSyncTime();
   }
 
   ngOnDestroy(): void {
@@ -436,6 +445,16 @@ export class TodoComponent implements OnInit, OnDestroy {
   syncWithServer(): void {
     if (this.isSyncing) return;
     
+    // Check if online
+    if (!this.isOnline) {
+      this.messageService.add({
+        severity: 'warn',
+        summary: 'Offline',
+        detail: 'Cannot sync while offline. Changes will be synced when connection is restored.'
+      });
+      return;
+    }
+    
     this.isSyncing = true;
     this.syncService.syncWithServer()
       .pipe(takeUntil(this.destroy$))
@@ -444,18 +463,21 @@ export class TodoComponent implements OnInit, OnDestroy {
           this.messageService.add({
             severity: 'success',
             summary: 'Sync Complete',
-            detail: 'Data synchronized successfully'
+            detail: 'Data synchronized successfully with server'
           });
           this.isSyncing = false;
+          this.loadData();
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Sync failed:', error);
           this.messageService.add({
             severity: 'error',
             summary: 'Sync Failed',
-            detail: 'Failed to sync with server. Changes are saved locally.'
+            detail: 'Failed to sync with server. Your changes are saved locally and will sync later.'
           });
           this.isSyncing = false;
+          this.cdr.markForCheck();
         }
       });
   }
@@ -465,6 +487,161 @@ export class TodoComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(changes => {
         this.pendingChanges = changes.length;
+        this.cdr.markForCheck();
       });
+    
+    // Also subscribe to detailed summary
+    this.syncService.getPendingChangesSummary()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(summary => {
+        this.pendingChangesSummary = summary;
+        this.cdr.markForCheck();
+      });
+  }
+
+  private subscribeToSyncStatus(): void {
+    this.syncService.syncStatus$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(status => {
+        this.syncStatus = status;
+        this.cdr.markForCheck();
+      });
+  }
+
+  private subscribeToOnlineStatus(): void {
+    this.syncService.onlineStatus$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(status => {
+        this.isOnline = status.isOnline;
+        
+        // Show notification when going offline/online
+        if (!status.isOnline && this.isOnline !== status.isOnline) {
+          this.messageService.add({
+            severity: 'warn',
+            summary: 'Offline',
+            detail: 'You are offline. Changes will be saved locally.'
+          });
+        } else if (status.isOnline && this.isOnline !== status.isOnline) {
+          this.messageService.add({
+            severity: 'info',
+            summary: 'Online',
+            detail: 'Connection restored. You can now sync your changes.'
+          });
+        }
+        
+        this.cdr.markForCheck();
+      });
+  }
+
+  private subscribeToLastSyncTime(): void {
+    this.syncService.lastSyncTime$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(time => {
+        this.lastSyncTime = time;
+        this.cdr.markForCheck();
+      });
+  }
+
+  showPendingDetails(): void {
+    // Refresh the summary before showing
+    this.syncService.getPendingChangesSummary()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(summary => {
+        this.pendingChangesSummary = summary;
+        this.showPendingDetailsDialog = true;
+        this.cdr.markForCheck();
+      });
+  }
+
+  getSyncStatusIcon(): string {
+    switch (this.syncStatus) {
+      case 'syncing': return 'pi pi-spin pi-spinner';
+      case 'success': return 'pi pi-check-circle';
+      case 'error': return 'pi pi-exclamation-circle';
+      default: return 'pi pi-circle';
+    }
+  }
+
+  getSyncStatusColor(): string {
+    switch (this.syncStatus) {
+      case 'syncing': return 'text-blue-600';
+      case 'success': return 'text-green-600';
+      case 'error': return 'text-red-600';
+      default: return 'text-gray-400';
+    }
+  }
+
+  getTimeSinceLastSync(): string {
+    if (!this.lastSyncTime) return 'Never';
+    
+    const now = new Date();
+    const diff = now.getTime() - this.lastSyncTime.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
+    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    return 'Just now';
+  }
+
+  // Data backup methods - Export/Import functionality
+  // These methods help mitigate data loss risk from localStorage being cleared
+  exportDataBackup(): void {
+    try {
+      const data = this.syncService.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `xtodo-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Export Complete',
+        detail: 'Data exported successfully. Keep this file safe for backup.'
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Export Failed',
+        detail: 'Failed to export data. Please try again.'
+      });
+    }
+  }
+
+  importDataBackup(event: any): void {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e: any) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        this.syncService.importData(data);
+        
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Import Complete',
+          detail: 'Data imported successfully. Your tasks and projects have been restored.'
+        });
+        
+        // Reload data
+        this.loadData();
+        this.loadStatistics();
+      } catch (error) {
+        console.error('Import failed:', error);
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Import Failed',
+          detail: 'Failed to import data. Please check the file format.'
+        });
+      }
+    };
+    reader.readAsText(file);
   }
 }
