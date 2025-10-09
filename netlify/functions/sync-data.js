@@ -1,7 +1,14 @@
 import { neon } from '@netlify/neon';
 import jwt from 'jsonwebtoken';
+import validator from 'validator';
 
 const sql = neon();
+
+// Security: Ensure JWT_SECRET is set in production
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
+if (process.env.CONTEXT === 'production' && JWT_SECRET === 'dev_secret_change_me') {
+  throw new Error('JWT_SECRET must be set in production environment');
+}
 
 // Authentication helper
 async function authenticate(headers) {
@@ -13,7 +20,12 @@ async function authenticate(headers) {
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret_change_me');
+    
+    // Enhanced JWT verification with issuer and audience validation
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      issuer: 'xtodo-app',
+      audience: 'xtodo-client'
+    });
     
     // Log the decoded token structure for debugging
     console.log('Decoded JWT payload:', JSON.stringify(decoded, null, 2));
@@ -211,6 +223,14 @@ async function processClientChanges(clientTasks, clientProjects, userId) {
     const wrapper = item && typeof item === 'object' && 'data' in item ? item : null;
     const action = wrapper ? (wrapper.action || wrapper.data?._action) : item?._action;
     const task = wrapper ? { ...wrapper.data, _action: action } : item;
+    
+    // Validate task data
+    const taskValidationError = validateTaskData(task);
+    if (taskValidationError) {
+      console.error(`Invalid task data: ${taskValidationError}`, task);
+      continue; // Skip invalid tasks
+    }
+    
     try {
       if (task._action === 'create') {
         const [newTask] = await sql`
@@ -218,10 +238,10 @@ async function processClientChanges(clientTasks, clientProjects, userId) {
           VALUES (
             ${task.id},
             ${userId},
-            ${task.title},
-            ${task.description || null},
+            ${sanitizeString(task.title)},
+            ${task.description ? sanitizeString(task.description) : null},
             ${Boolean(task.completed)},
-            ${task.priority},
+            ${sanitizeString(task.priority)},
             ${task.dueDate ? new Date(task.dueDate).toISOString() : null},
             ${task.projectId || null},
             ${new Date(task.createdAt).toISOString()},
@@ -238,10 +258,10 @@ async function processClientChanges(clientTasks, clientProjects, userId) {
       } else if (task._action === 'update') {
         const [updatedTask] = await sql`
           UPDATE tasks 
-          SET title = ${task.title},
-              description = ${task.description || null},
+          SET title = ${sanitizeString(task.title)},
+              description = ${task.description ? sanitizeString(task.description) : null},
               completed = ${Boolean(task.completed)}, 
-              priority = ${task.priority},
+              priority = ${sanitizeString(task.priority)},
               due_date = ${task.dueDate ? new Date(task.dueDate).toISOString() : null}, 
               project_id = ${task.projectId || null},
               updated_at = ${new Date(task.updatedAt).toISOString()}
@@ -268,6 +288,14 @@ async function processClientChanges(clientTasks, clientProjects, userId) {
     const wrapper = item && typeof item === 'object' && 'data' in item ? item : null;
     const action = wrapper ? (wrapper.action || wrapper.data?._action) : item?._action;
     const project = wrapper ? { ...wrapper.data, _action: action } : item;
+    
+    // Validate project data
+    const projectValidationError = validateProjectData(project);
+    if (projectValidationError) {
+      console.error(`Invalid project data: ${projectValidationError}`, project);
+      continue; // Skip invalid projects
+    }
+    
     try {
       if (project._action === 'create') {
         const [newProject] = await sql`
@@ -275,9 +303,9 @@ async function processClientChanges(clientTasks, clientProjects, userId) {
           VALUES (
             ${project.id},
             ${userId},
-            ${project.name},
-            ${project.description || null},
-            ${project.color},
+            ${sanitizeString(project.name)},
+            ${project.description ? sanitizeString(project.description) : null},
+            ${sanitizeString(project.color)},
             ${new Date(project.createdAt).toISOString()},
             ${new Date(project.updatedAt).toISOString()}
           )
@@ -291,9 +319,9 @@ async function processClientChanges(clientTasks, clientProjects, userId) {
       } else if (project._action === 'update') {
         const [updatedProject] = await sql`
           UPDATE projects 
-          SET name = ${project.name},
-              description = ${project.description || null}, 
-              color = ${project.color},
+          SET name = ${sanitizeString(project.name)},
+              description = ${project.description ? sanitizeString(project.description) : null}, 
+              color = ${sanitizeString(project.color)},
               updated_at = ${new Date(project.updatedAt).toISOString()}
           WHERE id = ${project.id} AND user_id = ${userId}
           RETURNING *
@@ -314,3 +342,108 @@ async function processClientChanges(clientTasks, clientProjects, userId) {
 
   return results;
 }
+
+// Input validation helpers
+function sanitizeString(input) {
+  if (typeof input !== 'string') return input;
+  return validator.escape(validator.trim(input));
+}
+
+function validateTaskData(task) {
+  if (!task || typeof task !== 'object') {
+    return 'Task must be an object';
+  }
+  
+  if (!task._action || !['create', 'update', 'delete'].includes(task._action)) {
+    return 'Task must have a valid _action field';
+  }
+  
+  if (!task.id || typeof task.id !== 'string') {
+    return 'Task must have a valid id';
+  }
+  
+  if (task._action === 'delete') {
+    return null; // Delete only needs id and action
+  }
+  
+  if (!task.title || typeof task.title !== 'string') {
+    return 'Task must have a valid title';
+  }
+  
+  if (task.title.length > 255) {
+    return 'Task title must be less than 255 characters';
+  }
+  
+  if (task.description && typeof task.description !== 'string') {
+    return 'Task description must be a string';
+  }
+  
+  if (task.priority && !['low', 'medium', 'high'].includes(task.priority)) {
+    return 'Task priority must be low, medium, or high';
+  }
+  
+  if (task.dueDate && !isValidDate(task.dueDate)) {
+    return 'Task dueDate must be a valid date';
+  }
+  
+  if (!task.createdAt || !isValidDate(task.createdAt)) {
+    return 'Task must have a valid createdAt date';
+  }
+  
+  if (!task.updatedAt || !isValidDate(task.updatedAt)) {
+    return 'Task must have a valid updatedAt date';
+  }
+  
+  return null;
+}
+
+function validateProjectData(project) {
+  if (!project || typeof project !== 'object') {
+    return 'Project must be an object';
+  }
+  
+  if (!project._action || !['create', 'update', 'delete'].includes(project._action)) {
+    return 'Project must have a valid _action field';
+  }
+  
+  if (!project.id || typeof project.id !== 'string') {
+    return 'Project must have a valid id';
+  }
+  
+  if (project._action === 'delete') {
+    return null; // Delete only needs id and action
+  }
+  
+  if (!project.name || typeof project.name !== 'string') {
+    return 'Project must have a valid name';
+  }
+  
+  if (project.name.length > 255) {
+    return 'Project name must be less than 255 characters';
+  }
+  
+  if (project.description && typeof project.description !== 'string') {
+    return 'Project description must be a string';
+  }
+  
+  if (project.color && !validator.isHexColor(project.color)) {
+    return 'Project color must be a valid hex color';
+  }
+  
+  if (!project.createdAt || !isValidDate(project.createdAt)) {
+    return 'Project must have a valid createdAt date';
+  }
+  
+  if (!project.updatedAt || !isValidDate(project.updatedAt)) {
+    return 'Project must have a valid updatedAt date';
+  }
+  
+  return null;
+}
+
+function isValidDate(dateString) {
+  if (!dateString) return false;
+  const date = new Date(dateString);
+  return date instanceof Date && !isNaN(date.getTime());
+}
+
