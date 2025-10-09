@@ -70,6 +70,10 @@ export class TodoComponent implements OnInit, OnDestroy {
     projectId: undefined
   };
   
+  // Validation errors
+  taskTitleError = '';
+  taskDescriptionError = '';
+  
   // UI state
   showAddDialog = false;
   showProjectDialog = false;
@@ -158,19 +162,69 @@ export class TodoComponent implements OnInit, OnDestroy {
       });
   }
 
+  // Sanitize input by removing HTML tags and trimming
+  private sanitizeInput(input: string): string {
+    return input.replace(/<[^>]*>/g, '').trim();
+  }
+
+  validateTaskTitle(): void {
+    const title = this.newTask.title?.trim() || '';
+    if (!title) {
+      this.taskTitleError = 'Task title is required';
+    } else if (title.length > 200) {
+      this.taskTitleError = 'Task title must be less than 200 characters';
+    } else {
+      this.taskTitleError = '';
+    }
+  }
+
+  validateTaskDescription(): void {
+    const description = this.newTask.description?.trim() || '';
+    if (description.length > 1000) {
+      this.taskDescriptionError = 'Description must be less than 1000 characters';
+    } else {
+      this.taskDescriptionError = '';
+    }
+  }
+
   addTask(): void {
+    this.validateTaskTitle();
+    this.validateTaskDescription();
+
+    if (this.taskTitleError || this.taskDescriptionError) {
+      return;
+    }
+
     if (!this.newTask.title?.trim()) {
       this.messageService.add({
         severity: 'error',
-        summary: 'Error',
-        detail: 'Task title is required'
+        summary: 'Validation Error',
+        detail: 'Task title is required. Please enter a title for your task.'
+      });
+      return;
+    }
+
+    if (this.newTask.title.trim().length > 200) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: 'Task title is too long. Maximum 200 characters allowed.'
+      });
+      return;
+    }
+
+    if (this.newTask.description && this.newTask.description.trim().length > 1000) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: 'Task description is too long. Maximum 1000 characters allowed.'
       });
       return;
     }
 
     const taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'userId'> = {
-      title: this.newTask.title.trim(),
-      description: this.newTask.description?.trim() || '',
+      title: this.sanitizeInput(this.newTask.title),
+      description: this.sanitizeInput(this.newTask.description || ''),
       completed: false,
       priority: this.newTask.priority || 'Medium',
       dueDate: this.newTask.dueDate,
@@ -341,6 +395,8 @@ export class TodoComponent implements OnInit, OnDestroy {
       dueDate: undefined,
       projectId: undefined
     };
+    this.taskTitleError = '';
+    this.taskDescriptionError = '';
   }
 
   getPriorityColor(priority: Task['priority']): string {

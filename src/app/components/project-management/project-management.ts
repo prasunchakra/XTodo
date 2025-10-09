@@ -57,6 +57,10 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
   
   editingProject: Project | null = null;
   
+  // Validation errors
+  projectNameError = '';
+  projectDescriptionError = '';
+  
   // UI state
   showAddDialog = false;
   showEditDialog = false;
@@ -117,19 +121,75 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
       });
   }
 
+  // Sanitize input by removing HTML tags and trimming
+  private sanitizeInput(input: string): string {
+    return input.replace(/<[^>]*>/g, '').trim();
+  }
+
+  validateProjectName(isEditing: boolean = false): void {
+    const name = isEditing 
+      ? (this.editingProject?.name?.trim() || '')
+      : (this.newProject.name?.trim() || '');
+    
+    if (!name) {
+      this.projectNameError = 'Project name is required';
+    } else if (name.length > 100) {
+      this.projectNameError = 'Project name must be less than 100 characters';
+    } else {
+      this.projectNameError = '';
+    }
+  }
+
+  validateProjectDescription(isEditing: boolean = false): void {
+    const description = isEditing 
+      ? (this.editingProject?.description?.trim() || '')
+      : (this.newProject.description?.trim() || '');
+    
+    if (description.length > 500) {
+      this.projectDescriptionError = 'Description must be less than 500 characters';
+    } else {
+      this.projectDescriptionError = '';
+    }
+  }
+
   addProject(): void {
+    this.validateProjectName(false);
+    this.validateProjectDescription(false);
+
+    if (this.projectNameError || this.projectDescriptionError) {
+      return;
+    }
+
     if (!this.newProject.name?.trim()) {
       this.messageService.add({
         severity: 'error',
-        summary: 'Error',
-        detail: 'Project name is required'
+        summary: 'Validation Error',
+        detail: 'Project name is required. Please enter a name for your project.'
+      });
+      return;
+    }
+
+    if (this.newProject.name.trim().length > 100) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: 'Project name is too long. Maximum 100 characters allowed.'
+      });
+      return;
+    }
+
+    if (this.newProject.description && this.newProject.description.trim().length > 500) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: 'Project description is too long. Maximum 500 characters allowed.'
       });
       return;
     }
 
     const projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'userId'> = {
-      name: this.newProject.name.trim(),
-      description: this.newProject.description?.trim() || '',
+      name: this.sanitizeInput(this.newProject.name),
+      description: this.sanitizeInput(this.newProject.description || ''),
       color: this.newProject.color || '#3B82F6'
     };
 
@@ -158,18 +218,43 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
   }
 
   editProject(): void {
+    this.validateProjectName(true);
+    this.validateProjectDescription(true);
+
+    if (this.projectNameError || this.projectDescriptionError) {
+      return;
+    }
+
     if (!this.editingProject || !this.editingProject.name?.trim()) {
       this.messageService.add({
         severity: 'error',
-        summary: 'Error',
-        detail: 'Project name is required'
+        summary: 'Validation Error',
+        detail: 'Project name is required. Please enter a name for your project.'
+      });
+      return;
+    }
+
+    if (this.editingProject.name.trim().length > 100) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: 'Project name is too long. Maximum 100 characters allowed.'
+      });
+      return;
+    }
+
+    if (this.editingProject.description && this.editingProject.description.trim().length > 500) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: 'Project description is too long. Maximum 500 characters allowed.'
       });
       return;
     }
 
     const updates: Partial<Omit<Project, 'id' | 'createdAt'>> = {
-      name: this.editingProject.name.trim(),
-      description: this.editingProject.description?.trim() || '',
+      name: this.sanitizeInput(this.editingProject.name),
+      description: this.sanitizeInput(this.editingProject.description || ''),
       color: this.editingProject.color
     };
 
@@ -234,6 +319,8 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
 
   openEditDialog(project: Project): void {
     this.editingProject = { ...project };
+    this.projectNameError = '';
+    this.projectDescriptionError = '';
     this.showEditDialog = true;
   }
 
@@ -243,6 +330,8 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
       description: '',
       color: '#3B82F6'
     };
+    this.projectNameError = '';
+    this.projectDescriptionError = '';
   }
 
   getTaskCount(projectId: string): number {
