@@ -46,8 +46,8 @@ export class SigninComponent {
     const passwordValue = this.password();
     if (!passwordValue) {
       this.passwordError.set('Password is required');
-    } else if (this.mode() === 'signup' && passwordValue.length < 6) {
-      this.passwordError.set('Password must be at least 6 characters');
+    } else if (this.mode() === 'signup' && passwordValue.length < 8) {
+      this.passwordError.set('Password must be at least 8 characters');
     } else {
       this.passwordError.set('');
     }
