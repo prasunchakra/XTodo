@@ -10,6 +10,122 @@ const DB_NAME = 'XTodoOfflineDB';
 const DB_VERSION = 1;
 const PENDING_CHANGES_STORE = 'pendingChanges';
 
+/**
+ * Singleton IndexedDB Manager
+ * Ensures only one database connection is created and shared across the application
+ * Implements connection pooling and proper lifecycle management
+ */
+class IndexedDBManager {
+  private static instance: IndexedDBManager;
+  private db: IDBDatabase | null = null;
+  private initPromise: Promise<void> | null = null;
+  private connectionCount = 0;
+  private isInitialized = false;
+
+  private constructor() {}
+
+  static getInstance(): IndexedDBManager {
+    if (!IndexedDBManager.instance) {
+      IndexedDBManager.instance = new IndexedDBManager();
+    }
+    return IndexedDBManager.instance;
+  }
+
+  async getConnection(): Promise<IDBDatabase | null> {
+    if (this.isInitialized && this.db) {
+      this.connectionCount++;
+      return this.db;
+    }
+
+    if (!this.initPromise) {
+      this.initPromise = this.initializeDatabase();
+    }
+
+    await this.initPromise;
+    this.connectionCount++;
+    return this.db;
+  }
+
+  releaseConnection(): void {
+    this.connectionCount = Math.max(0, this.connectionCount - 1);
+  }
+
+  private async initializeDatabase(): Promise<void> {
+    if (this.isInitialized) {
+      return;
+    }
+
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+      request.onerror = () => {
+        console.error('Failed to open IndexedDB, falling back to localStorage');
+        this.isInitialized = true;
+        resolve(); // Continue even if IndexedDB fails
+      };
+
+      request.onsuccess = (event) => {
+        this.db = (event.target as IDBOpenDBRequest).result;
+        this.isInitialized = true;
+        
+        // Add connection event listeners
+        this.db!.onclose = () => {
+          console.warn('IndexedDB connection closed unexpectedly');
+          this.db = null;
+          this.isInitialized = false;
+          this.initPromise = null;
+        };
+        
+        this.db!.onerror = (event) => {
+          console.error('IndexedDB error:', event);
+        };
+        
+        resolve();
+      };
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        
+        // Create object store for pending changes if it doesn't exist
+        if (!db.objectStoreNames.contains(PENDING_CHANGES_STORE)) {
+          const objectStore = db.createObjectStore(PENDING_CHANGES_STORE, { 
+            keyPath: 'id', 
+            autoIncrement: true 
+          });
+          // Create index for userId to support multi-user scenarios
+          objectStore.createIndex('userId', 'userId', { unique: false });
+          objectStore.createIndex('timestamp', 'timestamp', { unique: false });
+        }
+      };
+
+      request.onblocked = () => {
+        console.warn('IndexedDB upgrade blocked by another connection');
+        // Wait a bit and retry
+        setTimeout(() => {
+          this.initializeDatabase().then(resolve).catch(reject);
+        }, 100);
+      };
+    });
+  }
+
+  async closeConnection(): Promise<void> {
+    if (this.db && this.connectionCount <= 0) {
+      this.db.close();
+      this.db = null;
+      this.isInitialized = false;
+      this.initPromise = null;
+    }
+  }
+
+  isConnected(): boolean {
+    return this.isInitialized && this.db !== null;
+  }
+
+  getConnectionCount(): number {
+    return this.connectionCount;
+  }
+}
+
 interface SyncData {
   tasks: Task[];
   projects: Project[];
@@ -84,47 +200,27 @@ export class SyncService {
   private isSyncInProgress = false;
   private syncQueue: (() => void)[] = [];
 
-  // IndexedDB instance for persistent storage
-  private db: IDBDatabase | null = null;
+  // IndexedDB manager singleton for connection pooling
+  private dbManager = IndexedDBManager.getInstance();
 
   constructor() {
-    this.initIndexedDB().then(() => {
+    this.initializeService();
+  }
+
+  private async initializeService(): Promise<void> {
+    try {
+      // Get connection from singleton manager
+      await this.dbManager.getConnection();
       this.loadFromStorage();
       this.loadPendingChanges();
-    });
+    } catch (error) {
+      console.error('Failed to initialize sync service:', error);
+      // Continue with localStorage fallback
+      this.loadFromStorage();
+      this.loadPendingChanges();
+    }
   }
 
-  
-  private async initIndexedDB(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-      request.onerror = () => {
-        console.error('Failed to open IndexedDB, falling back to localStorage');
-        resolve(); // Continue even if IndexedDB fails
-      };
-
-      request.onsuccess = (event) => {
-        this.db = (event.target as IDBOpenDBRequest).result;
-        resolve();
-      };
-
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        
-        // Create object store for pending changes if it doesn't exist
-        if (!db.objectStoreNames.contains(PENDING_CHANGES_STORE)) {
-          const objectStore = db.createObjectStore(PENDING_CHANGES_STORE, { 
-            keyPath: 'id', 
-            autoIncrement: true 
-          });
-          // Create index for userId to support multi-user scenarios
-          objectStore.createIndex('userId', 'userId', { unique: false });
-          objectStore.createIndex('timestamp', 'timestamp', { unique: false });
-        }
-      };
-    });
-  }
 
   // Get user-specific storage keys
   private getStorageKeys() {
@@ -491,7 +587,7 @@ export class SyncService {
       const userId = user?.id || 'anonymous';
 
       // Try loading from IndexedDB first
-      if (this.db) {
+      if (this.dbManager.isConnected()) {
         const changes = await this.getFromIndexedDB(userId);
         if (changes && changes.length > 0) {
           this.pendingChangesSubject.next(changes);
@@ -508,7 +604,7 @@ export class SyncService {
         this.pendingChangesSubject.next(pending);
         
         // Migrate to IndexedDB for better persistence
-        if (this.db && pending.length > 0) {
+        if (this.dbManager.isConnected() && pending.length > 0) {
           await this.saveToIndexedDB(userId, pending);
           // Clear from localStorage after successful migration
           localStorage.removeItem(keys.PENDING_CHANGES_KEY);
@@ -525,128 +621,147 @@ export class SyncService {
   /**
    * Get pending changes from IndexedDB for a specific user
    */
-  private getFromIndexedDB(userId: string): Promise<any[]> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve([]);
-        return;
+  private async getFromIndexedDB(userId: string): Promise<any[]> {
+    try {
+      const db = await this.dbManager.getConnection();
+      if (!db) {
+        return [];
       }
 
-      try {
-        const transaction = this.db.transaction([PENDING_CHANGES_STORE], 'readonly');
-        const objectStore = transaction.objectStore(PENDING_CHANGES_STORE);
-        const index = objectStore.index('userId');
-        const request = index.getAll(userId);
+      return new Promise((resolve, reject) => {
+        try {
+          const transaction = db.transaction([PENDING_CHANGES_STORE], 'readonly');
+          const objectStore = transaction.objectStore(PENDING_CHANGES_STORE);
+          const index = objectStore.index('userId');
+          const request = index.getAll(userId);
 
-        request.onsuccess = () => {
-          const results = request.result || [];
-          // Extract the actual change data (remove IndexedDB metadata)
-          const changes = results.map((item: any) => ({
-            type: item.type,
-            action: item.action,
-            data: item.data,
-            timestamp: item.timestamp
-          }));
-          resolve(changes);
-        };
+          request.onsuccess = () => {
+            const results = request.result || [];
+            // Extract the actual change data (remove IndexedDB metadata)
+            const changes = results.map((item: any) => ({
+              type: item.type,
+              action: item.action,
+              data: item.data,
+              timestamp: item.timestamp
+            }));
+            resolve(changes);
+          };
 
-        request.onerror = () => {
-          console.error('Failed to load from IndexedDB');
+          request.onerror = () => {
+            console.error('Failed to load from IndexedDB');
+            resolve([]);
+          };
+        } catch (error) {
+          console.error('Error in getFromIndexedDB:', error);
           resolve([]);
-        };
-      } catch (error) {
-        console.error('Error in getFromIndexedDB:', error);
-        resolve([]);
-      }
-    });
+        } finally {
+          this.dbManager.releaseConnection();
+        }
+      });
+    } catch (error) {
+      console.error('Failed to get IndexedDB connection:', error);
+      return [];
+    }
   }
 
   /**
    * Save pending changes to IndexedDB
    */
   private async saveToIndexedDB(userId: string, changes: any[]): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve();
+    try {
+      const db = await this.dbManager.getConnection();
+      if (!db) {
         return;
       }
 
-      try {
-        const transaction = this.db.transaction([PENDING_CHANGES_STORE], 'readwrite');
-        const objectStore = transaction.objectStore(PENDING_CHANGES_STORE);
+      return new Promise((resolve, reject) => {
+        try {
+          const transaction = db.transaction([PENDING_CHANGES_STORE], 'readwrite');
+          const objectStore = transaction.objectStore(PENDING_CHANGES_STORE);
 
-        // Clear existing entries for this user first
-        const index = objectStore.index('userId');
-        const clearRequest = index.openCursor(IDBKeyRange.only(userId));
-        
-        clearRequest.onsuccess = (event) => {
-          const cursor = (event.target as IDBRequest).result;
-          if (cursor) {
-            cursor.delete();
-            cursor.continue();
-          } else {
-            // Add new entries
-            changes.forEach(change => {
-              objectStore.add({
-                userId,
-                type: change.type,
-                action: change.action,
-                data: change.data,
-                timestamp: change.timestamp
+          // Clear existing entries for this user first
+          const index = objectStore.index('userId');
+          const clearRequest = index.openCursor(IDBKeyRange.only(userId));
+          
+          clearRequest.onsuccess = (event) => {
+            const cursor = (event.target as IDBRequest).result;
+            if (cursor) {
+              cursor.delete();
+              cursor.continue();
+            } else {
+              // Add new entries
+              changes.forEach(change => {
+                objectStore.add({
+                  userId,
+                  type: change.type,
+                  action: change.action,
+                  data: change.data,
+                  timestamp: change.timestamp
+                });
               });
-            });
-          }
-        };
+            }
+          };
 
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => {
-          console.error('Failed to save to IndexedDB');
-          resolve(); // Don't fail, fallback to localStorage
-        };
-      } catch (error) {
-        console.error('Error in saveToIndexedDB:', error);
-        resolve();
-      }
-    });
+          transaction.oncomplete = () => resolve();
+          transaction.onerror = () => {
+            console.error('Failed to save to IndexedDB');
+            resolve(); // Don't fail, fallback to localStorage
+          };
+        } catch (error) {
+          console.error('Error in saveToIndexedDB:', error);
+          resolve();
+        } finally {
+          this.dbManager.releaseConnection();
+        }
+      });
+    } catch (error) {
+      console.error('Failed to get IndexedDB connection:', error);
+    }
   }
 
   /**
    * Clear specific pending changes from IndexedDB
    */
   private async clearFromIndexedDB(userId: string, confirmedIds: Set<string>): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve();
+    try {
+      const db = await this.dbManager.getConnection();
+      if (!db) {
         return;
       }
 
-      try {
-        const transaction = this.db.transaction([PENDING_CHANGES_STORE], 'readwrite');
-        const objectStore = transaction.objectStore(PENDING_CHANGES_STORE);
-        const index = objectStore.index('userId');
-        const request = index.openCursor(IDBKeyRange.only(userId));
+      return new Promise((resolve, reject) => {
+        try {
+          const transaction = db.transaction([PENDING_CHANGES_STORE], 'readwrite');
+          const objectStore = transaction.objectStore(PENDING_CHANGES_STORE);
+          const index = objectStore.index('userId');
+          const request = index.openCursor(IDBKeyRange.only(userId));
 
-        request.onsuccess = (event) => {
-          const cursor = (event.target as IDBRequest).result;
-          if (cursor) {
-            const change = cursor.value;
-            if (confirmedIds.has(change.data?.id)) {
-              cursor.delete();
+          request.onsuccess = (event) => {
+            const cursor = (event.target as IDBRequest).result;
+            if (cursor) {
+              const change = cursor.value;
+              if (confirmedIds.has(change.data?.id)) {
+                cursor.delete();
+              }
+              cursor.continue();
             }
-            cursor.continue();
-          }
-        };
+          };
 
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => {
-          console.error('Failed to clear from IndexedDB');
+          transaction.oncomplete = () => resolve();
+          transaction.onerror = () => {
+            console.error('Failed to clear from IndexedDB');
+            resolve();
+          };
+        } catch (error) {
+          console.error('Error in clearFromIndexedDB:', error);
           resolve();
-        };
-      } catch (error) {
-        console.error('Error in clearFromIndexedDB:', error);
-        resolve();
-      }
-    });
+        } finally {
+          this.dbManager.releaseConnection();
+        }
+      });
+    } catch (error) {
+      console.error('Failed to get IndexedDB connection:', error);
+    }
   }
 
   private getPendingChanges(): any[] {
@@ -668,11 +783,11 @@ export class SyncService {
     pending.push(newChange);
     this.pendingChangesSubject.next(pending);
 
-    // Save to IndexedDB
+    // Save to IndexedDB using singleton manager
     const user = this.authService.getCurrentUserSnapshot();
     const userId = user?.id || 'anonymous';
     
-    if (this.db) {
+    if (this.dbManager.isConnected()) {
       this.saveToIndexedDB(userId, pending).catch(error => {
         console.error('Failed to save to IndexedDB, using localStorage fallback:', error);
         this.savePendingToLocalStorage(pending);
@@ -710,11 +825,11 @@ export class SyncService {
     const remaining = pending.filter(change => !confirmedIds.has(change.data.id));
     this.pendingChangesSubject.next(remaining);
 
-    // Update IndexedDB
+    // Update IndexedDB using singleton manager
     const user = this.authService.getCurrentUserSnapshot();
     const userId = user?.id || 'anonymous';
     
-    if (this.db) {
+    if (this.dbManager.isConnected()) {
       this.clearFromIndexedDB(userId, confirmedIds).then(() => {
         // Save updated state to IndexedDB
         return this.saveToIndexedDB(userId, remaining);
@@ -852,5 +967,23 @@ export class SyncService {
       console.error('Error importing data:', error);
       throw error;
     }
+  }
+
+  /**
+   * Cleanup method to properly close IndexedDB connections
+   * Should be called when the service is no longer needed
+   */
+  cleanup(): void {
+    this.dbManager.closeConnection();
+  }
+
+  /**
+   * Get connection statistics for debugging
+   */
+  getConnectionStats(): { isConnected: boolean; connectionCount: number } {
+    return {
+      isConnected: this.dbManager.isConnected(),
+      connectionCount: this.dbManager.getConnectionCount()
+    };
   }
 }
