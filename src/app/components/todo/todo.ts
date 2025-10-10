@@ -30,40 +30,6 @@ import { Task, Project, TaskFilters } from '../../models/task';
 
 type ViewType = 'all' | 'active' | 'completed';
 
-/**
- * Performance Optimizations Applied (IXT11):
- * 
- * 1. Loading States: Added comprehensive loading indicators for all async operations
- *    - isLoadingTasks, isLoadingStatistics, isAddingTask, etc.
- *    - Prevents race conditions and provides user feedback
- *    - Skeleton loaders for better perceived performance
- * 
- * 2. Memory Leak Prevention:
- *    - Proper cleanup in ngOnDestroy with takeUntil pattern
- *    - All subscriptions properly managed via destroy$ subject
- *    - FilterSubject$ properly completed on component destruction
- * 
- * 3. Debouncing:
- *    - Filter operations debounced at 300ms to prevent rapid API calls
- *    - Search input debounced to reduce unnecessary processing
- *    - Prevents memory issues during rapid user input
- * 
- * 4. Virtual Scrolling:
- *    - Implemented PrimeNG Scroller for lists with 20+ items
- *    - Only renders visible items in viewport
- *    - Dramatically reduces DOM nodes for large datasets (50+ tasks)
- *    - Improves both rendering performance and memory usage
- * 
- * 5. OnPush Change Detection:
- *    - Uses ChangeDetectionStrategy.OnPush
- *    - Manual change detection triggers via ChangeDetectorRef
- *    - Reduces unnecessary change detection cycles
- * 
- * 6. Action Throttling:
- *    - Prevents rapid-fire task creation/deletion/toggling
- *    - Checks loading states before allowing operations
- *    - Disables UI elements during pending operations
- */
 
 @Component({
   selector: 'app-todo',
@@ -160,6 +126,7 @@ export class TodoComponent implements OnInit, OnDestroy {
     this.subscribeToSyncStatus();
     this.subscribeToOnlineStatus();
     this.subscribeToLastSyncTime();
+    this.setupFilterDebounce();
   }
 
   ngOnDestroy(): void {
@@ -426,6 +393,24 @@ export class TodoComponent implements OnInit, OnDestroy {
   setView(view: ViewType): void {
     this.selectedView = view;
     this.triggerFilterDebounce();
+  }
+
+  private setupFilterDebounce(): void {
+    // Setup debounced filter operations to prevent rapid API calls
+    this.filterSubject$
+      .pipe(
+        debounceTime(300), // 300ms debounce
+        distinctUntilChanged(),
+        takeUntil(this.destroy$)
+      )
+      .subscribe(() => {
+        this.applyFilters();
+      });
+  }
+
+  triggerFilterDebounce(): void {
+    // Trigger the debounced filter operation
+    this.filterSubject$.next();
   }
 
   applyFilters(): void {

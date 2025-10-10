@@ -765,6 +765,35 @@ export class SyncService {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
   }
 
+  // Get detailed summary of pending changes
+  getPendingChangesSummary(): Observable<PendingChangesSummary> {
+    return new Observable(observer => {
+      const pendingChanges = this.pendingChangesSubject.value;
+      
+      // Count changes by type and action
+      const tasks = { create: 0, update: 0, delete: 0 };
+      const projects = { create: 0, update: 0, delete: 0 };
+      
+      pendingChanges.forEach(change => {
+        if (change.type === 'task') {
+          tasks[change.action as keyof typeof tasks]++;
+        } else if (change.type === 'project') {
+          projects[change.action as keyof typeof projects]++;
+        }
+      });
+      
+      const summary: PendingChangesSummary = {
+        total: pendingChanges.length,
+        tasks,
+        projects,
+        changes: pendingChanges
+      };
+      
+      observer.next(summary);
+      observer.complete();
+    });
+  }
+
   // Data backup/export functionality - Export all data as JSON
   // Usage: Users can manually trigger this to backup their data
   // This helps mitigate data loss risk from localStorage being cleared
