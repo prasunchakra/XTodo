@@ -378,7 +378,12 @@ function validateTaskData(task) {
     return 'Task description must be a string';
   }
   
-  if (task.priority && !['low', 'medium', 'high'].includes(task.priority)) {
+  if (
+    task.priority &&
+    !['low', 'medium', 'high'].includes(
+      typeof task.priority === 'string' ? task.priority.toLowerCase() : task.priority
+    )
+  ) {
     return 'Task priority must be low, medium, or high';
   }
   
