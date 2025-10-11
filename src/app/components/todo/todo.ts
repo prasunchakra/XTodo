@@ -1,8 +1,8 @@
-import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, takeUntil, debounceTime, distinctUntilChanged } from 'rxjs';
 
 // PrimeNG Components
 import { CardModule } from 'primeng/card';
@@ -18,14 +18,18 @@ import { ToastModule } from 'primeng/toast';
 import { ChipModule } from 'primeng/chip';
 import { BadgeModule } from 'primeng/badge';
 import { TooltipModule } from 'primeng/tooltip';
+import { ScrollerModule } from 'primeng/scroller';
+import { SkeletonModule } from 'primeng/skeleton';
+import { ProgressSpinnerModule } from 'primeng/progressspinner';
 
 // Services and Models
 import { TaskService } from '../../services/task';
 import { ProjectService } from '../../services/project.service';
-import { SyncService } from '../../services/sync.service';
+import { SyncService, SyncStatus, PendingChangesSummary } from '../../services/sync.service';
 import { Task, Project, TaskFilters } from '../../models/task';
 
 type ViewType = 'all' | 'active' | 'completed';
+
 
 @Component({
   selector: 'app-todo',
@@ -44,7 +48,10 @@ type ViewType = 'all' | 'active' | 'completed';
     ToastModule,
     ChipModule,
     BadgeModule,
-    TooltipModule
+    TooltipModule,
+    ScrollerModule,
+    SkeletonModule,
+    ProgressSpinnerModule
   ],
   providers: [ConfirmationService, MessageService],
   templateUrl: './todo.html',
@@ -59,7 +66,19 @@ export class TodoComponent implements OnInit, OnDestroy {
   statistics: any = {};
   isSyncing = false;
   pendingChanges = 0;
+  pendingChangesSummary: PendingChangesSummary | null = null;
   showProjectGroups = true;
+  syncStatus: SyncStatus = 'idle';
+  lastSyncTime: Date | null = null;
+  isOnline = true;
+  showPendingDetailsDialog = false;
+  
+  // Loading states - track async operations to prevent race conditions and provide user feedback
+  isLoadingTasks = false;
+  isLoadingStatistics = false;
+  isAddingTask = false;
+  isDeletingTask: string | null = null; // Track specific task being deleted
+  isTogglingTask: string | null = null; // Track specific task being toggled
   
   // Form data
   newTask: Partial<Task> = {
@@ -69,6 +88,10 @@ export class TodoComponent implements OnInit, OnDestroy {
     dueDate: undefined,
     projectId: undefined
   };
+  
+  // Validation errors
+  taskTitleError = '';
+  taskDescriptionError = '';
   
   // UI state
   showAddDialog = false;
@@ -87,31 +110,44 @@ export class TodoComponent implements OnInit, OnDestroy {
   viewOptions: ViewType[] = ['all', 'active', 'completed'];
   
   private destroy$ = new Subject<void>();
+  private filterSubject$ = new Subject<void>(); // Debounce subject for filter operations
 
   private taskService = inject(TaskService);
   private projectService = inject(ProjectService);
   private syncService = inject(SyncService);
   private confirmationService = inject(ConfirmationService);
   private messageService = inject(MessageService);
+  private cdr = inject(ChangeDetectorRef); // Manually trigger change detection for OnPush strategy
 
   ngOnInit(): void {
     this.loadData();
     this.loadStatistics();
     this.subscribeToPendingChanges();
+    this.subscribeToSyncStatus();
+    this.subscribeToOnlineStatus();
+    this.subscribeToLastSyncTime();
+    this.setupFilterDebounce();
   }
 
   ngOnDestroy(): void {
+    // Clean up all subscriptions to prevent memory leaks
     this.destroy$.next();
     this.destroy$.complete();
+    this.filterSubject$.complete();
   }
 
   loadData(): void {
+    this.isLoadingTasks = true;
+    this.cdr.markForCheck();
+    
     this.taskService.getTasksWithProjects()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (tasks) => {
           this.tasks = tasks;
           this.applyFilters();
+          this.isLoadingTasks = false;
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Error loading tasks:', error);
@@ -120,6 +156,8 @@ export class TodoComponent implements OnInit, OnDestroy {
             summary: 'Error',
             detail: 'Failed to load tasks. Please try again.'
           });
+          this.isLoadingTasks = false;
+          this.cdr.markForCheck();
         }
       });
 
@@ -128,6 +166,7 @@ export class TodoComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (projects) => {
           this.projects = projects;
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Error loading projects:', error);
@@ -136,16 +175,22 @@ export class TodoComponent implements OnInit, OnDestroy {
             summary: 'Error',
             detail: 'Failed to load projects. Please try again.'
           });
+          this.cdr.markForCheck();
         }
       });
   }
 
   loadStatistics(): void {
+    this.isLoadingStatistics = true;
+    this.cdr.markForCheck();
+    
     this.taskService.getTaskStatistics()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (stats) => {
           this.statistics = stats;
+          this.isLoadingStatistics = false;
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Error loading statistics:', error);
@@ -154,28 +199,88 @@ export class TodoComponent implements OnInit, OnDestroy {
             summary: 'Error',
             detail: 'Failed to load statistics. Please try again.'
           });
+          this.isLoadingStatistics = false;
+          this.cdr.markForCheck();
         }
       });
   }
 
+  // Sanitize input by removing HTML tags and trimming
+  private sanitizeInput(input: string): string {
+    return input.replace(/<[^>]*>/g, '').trim();
+  }
+
+  validateTaskTitle(): void {
+    const title = this.newTask.title?.trim() || '';
+    if (!title) {
+      this.taskTitleError = 'Task title is required';
+    } else if (title.length > 200) {
+      this.taskTitleError = 'Task title must be less than 200 characters';
+    } else {
+      this.taskTitleError = '';
+    }
+  }
+
+  validateTaskDescription(): void {
+    const description = this.newTask.description?.trim() || '';
+    if (description.length > 1000) {
+      this.taskDescriptionError = 'Description must be less than 1000 characters';
+    } else {
+      this.taskDescriptionError = '';
+    }
+  }
+
   addTask(): void {
+    this.validateTaskTitle();
+    this.validateTaskDescription();
+
+    if (this.taskTitleError || this.taskDescriptionError) {
+      return;
+    }
+
     if (!this.newTask.title?.trim()) {
       this.messageService.add({
         severity: 'error',
-        summary: 'Error',
-        detail: 'Task title is required'
+        summary: 'Validation Error',
+        detail: 'Task title is required. Please enter a title for your task.'
       });
       return;
     }
 
+    if (this.newTask.title.trim().length > 200) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: 'Task title is too long. Maximum 200 characters allowed.'
+      });
+      return;
+    }
+
+    if (this.newTask.description && this.newTask.description.trim().length > 1000) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: 'Task description is too long. Maximum 1000 characters allowed.'
+      });
+      return;
+    }
+
+    // Prevent rapid task creation
+    if (this.isAddingTask) {
+      return;
+    }
+
     const taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'userId'> = {
-      title: this.newTask.title.trim(),
-      description: this.newTask.description?.trim() || '',
+      title: this.sanitizeInput(this.newTask.title),
+      description: this.sanitizeInput(this.newTask.description || ''),
       completed: false,
       priority: this.newTask.priority || 'Medium',
       dueDate: this.newTask.dueDate,
       projectId: this.newTask.projectId
     };
+
+    this.isAddingTask = true;
+    this.cdr.markForCheck();
 
     this.taskService.addTask(taskData)
       .pipe(takeUntil(this.destroy$))
@@ -188,8 +293,10 @@ export class TodoComponent implements OnInit, OnDestroy {
           });
           this.resetNewTask();
           this.showAddDialog = false;
+          this.isAddingTask = false;
           this.loadData();
           this.loadStatistics();
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Error adding task:', error);
@@ -198,17 +305,29 @@ export class TodoComponent implements OnInit, OnDestroy {
             summary: 'Error',
             detail: 'Failed to add task. Please try again.'
           });
+          this.isAddingTask = false;
+          this.cdr.markForCheck();
         }
       });
   }
 
   toggleTaskCompletion(task: Task): void {
+    // Prevent rapid toggling
+    if (this.isTogglingTask === task.id) {
+      return;
+    }
+
+    this.isTogglingTask = task.id;
+    this.cdr.markForCheck();
+
     this.taskService.toggleTaskCompletion(task.id)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
           this.loadData();
           this.loadStatistics();
+          this.isTogglingTask = null;
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Error toggling task completion:', error);
@@ -217,16 +336,26 @@ export class TodoComponent implements OnInit, OnDestroy {
             summary: 'Error',
             detail: 'Failed to update task. Please try again.'
           });
+          this.isTogglingTask = null;
+          this.cdr.markForCheck();
         }
       });
   }
 
   deleteTask(task: Task): void {
+    // Prevent rapid deletion
+    if (this.isDeletingTask) {
+      return;
+    }
+
     this.confirmationService.confirm({
       message: `Are you sure you want to delete "${task.title}"?`,
       header: 'Delete Confirmation',
       icon: 'pi pi-exclamation-triangle',
       accept: () => {
+        this.isDeletingTask = task.id;
+        this.cdr.markForCheck();
+
         this.taskService.deleteTask(task.id)
           .pipe(takeUntil(this.destroy$))
           .subscribe({
@@ -238,6 +367,8 @@ export class TodoComponent implements OnInit, OnDestroy {
               });
               this.loadData();
               this.loadStatistics();
+              this.isDeletingTask = null;
+              this.cdr.markForCheck();
             },
             error: (error) => {
               console.error('Error deleting task:', error);
@@ -246,6 +377,8 @@ export class TodoComponent implements OnInit, OnDestroy {
                 summary: 'Error',
                 detail: 'Failed to delete task. Please try again.'
               });
+              this.isDeletingTask = null;
+              this.cdr.markForCheck();
             }
           });
       }
@@ -259,7 +392,25 @@ export class TodoComponent implements OnInit, OnDestroy {
 
   setView(view: ViewType): void {
     this.selectedView = view;
-    this.applyFilters();
+    this.triggerFilterDebounce();
+  }
+
+  private setupFilterDebounce(): void {
+    // Setup debounced filter operations to prevent rapid API calls
+    this.filterSubject$
+      .pipe(
+        debounceTime(300), // 300ms debounce
+        distinctUntilChanged(),
+        takeUntil(this.destroy$)
+      )
+      .subscribe(() => {
+        this.applyFilters();
+      });
+  }
+
+  triggerFilterDebounce(): void {
+    // Trigger the debounced filter operation
+    this.filterSubject$.next();
   }
 
   applyFilters(): void {
@@ -284,6 +435,7 @@ export class TodoComponent implements OnInit, OnDestroy {
           this.tasks = tasks;
           this.filteredTasks = tasks;
           this.groupTasksByProject();
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Error applying filters:', error);
@@ -292,6 +444,7 @@ export class TodoComponent implements OnInit, OnDestroy {
             summary: 'Error',
             detail: 'Failed to apply filters. Please try again.'
           });
+          this.cdr.markForCheck();
         }
       });
   }
@@ -341,6 +494,8 @@ export class TodoComponent implements OnInit, OnDestroy {
       dueDate: undefined,
       projectId: undefined
     };
+    this.taskTitleError = '';
+    this.taskDescriptionError = '';
   }
 
   getPriorityColor(priority: Task['priority']): string {
@@ -380,7 +535,19 @@ export class TodoComponent implements OnInit, OnDestroy {
   syncWithServer(): void {
     if (this.isSyncing) return;
     
+    // Check if online
+    if (!this.isOnline) {
+      this.messageService.add({
+        severity: 'warn',
+        summary: 'Offline',
+        detail: 'Cannot sync while offline. Changes will be synced when connection is restored.'
+      });
+      return;
+    }
+    
     this.isSyncing = true;
+    this.cdr.markForCheck();
+    
     this.syncService.syncWithServer()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -388,18 +555,21 @@ export class TodoComponent implements OnInit, OnDestroy {
           this.messageService.add({
             severity: 'success',
             summary: 'Sync Complete',
-            detail: 'Data synchronized successfully'
+            detail: 'Data synchronized successfully with server'
           });
           this.isSyncing = false;
+          this.loadData();
+          this.cdr.markForCheck();
         },
         error: (error) => {
           console.error('Sync failed:', error);
           this.messageService.add({
             severity: 'error',
             summary: 'Sync Failed',
-            detail: 'Failed to sync with server. Changes are saved locally.'
+            detail: 'Failed to sync with server. Your changes are saved locally and will sync later.'
           });
           this.isSyncing = false;
+          this.cdr.markForCheck();
         }
       });
   }
@@ -409,6 +579,161 @@ export class TodoComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(changes => {
         this.pendingChanges = changes.length;
+        this.cdr.markForCheck();
       });
+    
+    // Also subscribe to detailed summary
+    this.syncService.getPendingChangesSummary()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(summary => {
+        this.pendingChangesSummary = summary;
+        this.cdr.markForCheck();
+      });
+  }
+
+  private subscribeToSyncStatus(): void {
+    this.syncService.syncStatus$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(status => {
+        this.syncStatus = status;
+        this.cdr.markForCheck();
+      });
+  }
+
+  private subscribeToOnlineStatus(): void {
+    this.syncService.onlineStatus$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(status => {
+        this.isOnline = status.isOnline;
+        
+        // Show notification when going offline/online
+        if (!status.isOnline && this.isOnline !== status.isOnline) {
+          this.messageService.add({
+            severity: 'warn',
+            summary: 'Offline',
+            detail: 'You are offline. Changes will be saved locally.'
+          });
+        } else if (status.isOnline && this.isOnline !== status.isOnline) {
+          this.messageService.add({
+            severity: 'info',
+            summary: 'Online',
+            detail: 'Connection restored. You can now sync your changes.'
+          });
+        }
+        
+        this.cdr.markForCheck();
+      });
+  }
+
+  private subscribeToLastSyncTime(): void {
+    this.syncService.lastSyncTime$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(time => {
+        this.lastSyncTime = time;
+        this.cdr.markForCheck();
+      });
+  }
+
+  showPendingDetails(): void {
+    // Refresh the summary before showing
+    this.syncService.getPendingChangesSummary()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(summary => {
+        this.pendingChangesSummary = summary;
+        this.showPendingDetailsDialog = true;
+        this.cdr.markForCheck();
+      });
+  }
+
+  getSyncStatusIcon(): string {
+    switch (this.syncStatus) {
+      case 'syncing': return 'pi pi-spin pi-spinner';
+      case 'success': return 'pi pi-check-circle';
+      case 'error': return 'pi pi-exclamation-circle';
+      default: return 'pi pi-circle';
+    }
+  }
+
+  getSyncStatusColor(): string {
+    switch (this.syncStatus) {
+      case 'syncing': return 'text-blue-600';
+      case 'success': return 'text-green-600';
+      case 'error': return 'text-red-600';
+      default: return 'text-gray-400';
+    }
+  }
+
+  getTimeSinceLastSync(): string {
+    if (!this.lastSyncTime) return 'Never';
+    
+    const now = new Date();
+    const diff = now.getTime() - this.lastSyncTime.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
+    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    return 'Just now';
+  }
+
+  // Data backup methods - Export/Import functionality
+  // These methods help mitigate data loss risk from localStorage being cleared
+  exportDataBackup(): void {
+    try {
+      const data = this.syncService.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `xtodo-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Export Complete',
+        detail: 'Data exported successfully. Keep this file safe for backup.'
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Export Failed',
+        detail: 'Failed to export data. Please try again.'
+      });
+    }
+  }
+
+  importDataBackup(event: any): void {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e: any) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        this.syncService.importData(data);
+        
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Import Complete',
+          detail: 'Data imported successfully. Your tasks and projects have been restored.'
+        });
+        
+        // Reload data
+        this.loadData();
+        this.loadStatistics();
+      } catch (error) {
+        console.error('Import failed:', error);
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Import Failed',
+          detail: 'Failed to import data. Please check the file format.'
+        });
+      }
+    };
+    reader.readAsText(file);
   }
 }

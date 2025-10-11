@@ -12,7 +12,18 @@
 
   <!-- Statistics Cards -->
   <div class="max-w-7xl mx-auto mb-8">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+    <!-- Loading skeleton for statistics -->
+    <div *ngIf="isLoadingStatistics" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <p-card *ngFor="let i of [1,2,3,4,5]" class="text-center">
+        <div class="p-4">
+          <p-skeleton width="3rem" height="2rem" styleClass="mb-2"></p-skeleton>
+          <p-skeleton width="5rem" height="1rem"></p-skeleton>
+        </div>
+      </p-card>
+    </div>
+    
+    <!-- Actual statistics -->
+    <div *ngIf="!isLoadingStatistics" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
       <p-card class="text-center">
         <div class="p-4">
           <div class="text-2xl font-bold text-blue-600">{{ statistics.total || 0 }}</div>
@@ -52,20 +63,73 @@
 
   <!-- Sync Controls -->
   <div class="max-w-7xl mx-auto mb-6">
-    <div class="flex justify-center space-x-4">
-      <button 
-        pButton 
-        label="Sync with Server" 
-        icon="pi pi-refresh"
-        [loading]="isSyncing"
-        (click)="syncWithServer()"
-        class="p-button-success"
-        [disabled]="isSyncing"
-      ></button>
+    <div class="flex flex-col md:flex-row justify-center items-center gap-4">
+      <!-- Sync Button with Status -->
+      <div class="flex items-center gap-2">
+        <button 
+          pButton 
+          label="Sync with Server" 
+          icon="pi pi-refresh"
+          [loading]="isSyncing"
+          (click)="syncWithServer()"
+          class="p-button-success"
+          [disabled]="isSyncing || !isOnline"
+        ></button>
+        
+        <!-- Sync Status Indicator -->
+        <div class="flex items-center gap-2" [pTooltip]="'Sync status: ' + syncStatus">
+          <i [class]="getSyncStatusIcon() + ' ' + getSyncStatusColor()"></i>
+          <span class="text-sm text-gray-600">{{ getTimeSinceLastSync() }}</span>
+        </div>
+      </div>
+
+      <!-- Online/Offline Status -->
+      <div class="flex items-center gap-2 px-3 py-2 rounded-lg" 
+           [class]="isOnline ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
+        <i [class]="isOnline ? 'pi pi-wifi' : 'pi pi-exclamation-triangle'"></i>
+        <span class="text-sm font-medium">{{ isOnline ? 'Online' : 'Offline' }}</span>
+      </div>
       
-      <div *ngIf="pendingChanges > 0" class="flex items-center text-orange-600">
-        <i class="pi pi-exclamation-triangle mr-2"></i>
-        <span>{{ pendingChanges }} pending changes</span>
+      <!-- Pending Changes Indicator with Details -->
+      <div *ngIf="pendingChanges > 0" 
+           class="flex items-center gap-2 px-3 py-2 bg-orange-50 text-orange-700 rounded-lg cursor-pointer hover:bg-orange-100 transition-colors"
+           (click)="showPendingDetails()"
+           pTooltip="Click to see details">
+        <i class="pi pi-exclamation-triangle"></i>
+        <span class="text-sm font-medium">{{ pendingChanges }} pending change{{ pendingChanges > 1 ? 's' : '' }}</span>
+        <i class="pi pi-chevron-right text-xs"></i>
+      </div>
+
+      <!-- Data Backup Controls -->
+      <div class="flex items-center gap-2">
+        <button 
+          pButton 
+          icon="pi pi-download" 
+          severity="secondary"
+          size="small"
+          (click)="exportDataBackup()"
+          pTooltip="Export data backup"
+          class="p-button-text"
+        ></button>
+        <label class="cursor-pointer">
+          <input 
+            type="file" 
+            accept=".json" 
+            (change)="importDataBackup($event)"
+            class="hidden"
+            #fileInput
+          />
+          <button 
+            pButton 
+            icon="pi pi-upload" 
+            severity="secondary"
+            size="small"
+            type="button"
+            (click)="fileInput.click()"
+            pTooltip="Import data backup"
+            class="p-button-text"
+          ></button>
+        </label>
       </div>
     </div>
   </div>
@@ -79,13 +143,15 @@
         <p-card header="Filters" class="h-fit">
           <!-- Search -->
           <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Search</label>
+            <label for="search-tasks" class="block text-sm font-medium text-gray-700 mb-2">Search</label>
             <input 
+              id="search-tasks"
               pInputText 
-              type="text" 
+              type="search" 
               placeholder="Search tasks..."
               [(ngModel)]="filters.search"
               (input)="applyFilters()"
+              autocomplete="off"
               class="w-full"
             />
           </div>
@@ -123,7 +189,7 @@
             <label class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
             <select 
               [(ngModel)]="filters.priority"
-              (change)="applyFilters()"
+              (change)="triggerFilterDebounce()"
               class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option [value]="null">All Priorities</option>
@@ -138,7 +204,7 @@
             <label class="block text-sm font-medium text-gray-700 mb-2">Project</label>
             <select 
               [(ngModel)]="filters.projectId"
-              (change)="applyFilters()"
+              (change)="triggerFilterDebounce()"
               class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option [value]="null">All Projects</option>
@@ -162,8 +228,25 @@
       <!-- Right Content - Task List -->
       <div class="lg:col-span-3">
         <p-card header="Tasks" class="min-h-[600px]">
+          <!-- Loading skeleton -->
+          <div *ngIf="isLoadingTasks" class="space-y-4">
+            <div *ngFor="let i of [1,2,3,4,5]" class="border border-gray-200 rounded-lg p-4">
+              <div class="flex items-start space-x-3">
+                <p-skeleton shape="circle" size="1.5rem"></p-skeleton>
+                <div class="flex-1">
+                  <p-skeleton width="60%" height="1.5rem" styleClass="mb-2"></p-skeleton>
+                  <p-skeleton width="80%" height="1rem" styleClass="mb-3"></p-skeleton>
+                  <div class="flex gap-2">
+                    <p-skeleton width="4rem" height="1.5rem" borderRadius="1rem"></p-skeleton>
+                    <p-skeleton width="5rem" height="1.5rem" borderRadius="1rem"></p-skeleton>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Task List -->
-          <div *ngIf="filteredTasks.length === 0" class="text-center py-12">
+          <div *ngIf="!isLoadingTasks && filteredTasks.length === 0" class="text-center py-12">
             <div class="text-gray-400 mb-4">
               <i class="pi pi-inbox text-6xl"></i>
             </div>
@@ -172,7 +255,7 @@
           </div>
 
           <!-- Grouped View -->
-          <div *ngIf="showProjectGroups && groupedTasks.length > 0">
+          <div *ngIf="!isLoadingTasks && showProjectGroups && groupedTasks.length > 0">
             <div *ngFor="let group of groupedTasks" class="mb-6">
               <!-- Project Header -->
               <div class="flex items-center mb-3">
@@ -194,17 +277,112 @@
                 </div>
               </div>
               
-              <!-- Tasks in this group -->
-              <div *ngFor="let task of group.tasks" class="mb-4 last:mb-0 ml-6">
-                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div class="flex items-start space-x-3">
-                    <!-- Checkbox -->
-                    <p-checkbox 
-                      [binary]="true"
-                      [ngModel]="task.completed"
-                      (onChange)="toggleTaskCompletion(task)"
-                      class="mt-1"
-                    ></p-checkbox>
+              <!-- Tasks in this group - Use virtual scroller for performance with large lists -->
+              <!-- Virtual scrolling renders only visible items, improving performance with 50+ tasks -->
+              <p-scroller 
+                *ngIf="group.tasks.length > 20"
+                [items]="group.tasks" 
+                [itemSize]="120"
+                [scrollHeight]="'500px'"
+              >
+                <ng-template pTemplate="item" let-task>
+                  <div class="mb-4 last:mb-0 ml-6">
+                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div class="flex items-start space-x-3">
+                        <!-- Checkbox -->
+                        <p-checkbox 
+                          [binary]="true"
+                          [ngModel]="task.completed"
+                          (onChange)="toggleTaskCompletion(task)"
+                          [disabled]="isTogglingTask === task.id"
+                          class="mt-1"
+                        ></p-checkbox>
+
+                        <!-- Task Content -->
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                              <h3 
+                                [class]="'text-lg font-medium ' + (task.completed ? 'line-through text-gray-500' : 'text-gray-900')"
+                              >
+                                {{ task.title }}
+                              </h3>
+                              
+                              <p 
+                                *ngIf="task.description"
+                                [class]="'text-sm mt-1 ' + (task.completed ? 'text-gray-400' : 'text-gray-600')"
+                              >
+                                {{ task.description }}
+                              </p>
+
+                              <!-- Task Meta -->
+                              <div class="flex flex-wrap items-center gap-2 mt-3">
+                                <!-- Priority -->
+                                <span 
+                                  [class]="'px-2 py-1 text-xs font-medium rounded-full ' + getPriorityColor(task.priority)"
+                                >
+                                  {{ task.priority }}
+                                </span>
+
+                                <!-- Project -->
+                                <span 
+                                  *ngIf="task.projectId"
+                                  [class]="'px-2 py-1 text-xs font-medium rounded-full ' + getProjectColor(task.projectId)"
+                                >
+                                  {{ getProjectName(task.projectId) }}
+                                </span>
+
+                                <!-- Due Date -->
+                                <span 
+                                  *ngIf="task.dueDate"
+                                  [class]="'px-2 py-1 text-xs font-medium rounded-full ' + 
+                                           (isOverdue(task) ? 'bg-red-100 text-red-800' : 
+                                            isDueToday(task) ? 'bg-blue-100 text-blue-800' : 
+                                            'bg-gray-100 text-gray-600')"
+                                >
+                                  <i class="pi pi-calendar mr-1"></i>
+                                  {{ task.dueDate | date:'shortDate' }}
+                                  <span *ngIf="isOverdue(task)" class="ml-1">(Overdue)</span>
+                                  <span *ngIf="isDueToday(task)" class="ml-1">(Today)</span>
+                                </span>
+                              </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="flex items-center space-x-2 ml-4">
+                              <button 
+                                pButton 
+                                icon="pi pi-trash" 
+                                severity="danger"
+                                size="small"
+                                (click)="deleteTask(task)"
+                                [disabled]="isDeletingTask === task.id"
+                                [loading]="isDeletingTask === task.id"
+                                pTooltip="Delete task"
+                                class="p-button-text"
+                              ></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </ng-template>
+              </p-scroller>
+              
+              <!-- Regular rendering for smaller lists -->
+              <div *ngIf="group.tasks.length <= 20">
+                <div *ngFor="let task of group.tasks" class="mb-4 last:mb-0 ml-6">
+                  <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-start space-x-3">
+                      <!-- Checkbox -->
+                      <p-checkbox 
+                        [binary]="true"
+                        [ngModel]="task.completed"
+                        (onChange)="toggleTaskCompletion(task)"
+                        [disabled]="isTogglingTask === task.id"
+                        class="mt-1"
+                      ></p-checkbox>
 
                     <!-- Task Content -->
                     <div class="flex-1 min-w-0">
@@ -264,6 +442,8 @@
                             severity="danger"
                             size="small"
                             (click)="deleteTask(task)"
+                            [disabled]="isDeletingTask === task.id"
+                            [loading]="isDeletingTask === task.id"
                             pTooltip="Delete task"
                             class="p-button-text"
                           ></button>
@@ -275,33 +455,130 @@
               </div>
             </div>
           </div>
+          </div>
 
           <!-- Flat View -->
-          <div *ngIf="!showProjectGroups">
-            <div *ngFor="let task of filteredTasks" class="mb-4 last:mb-0">
-              <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div class="flex items-start space-x-3">
-                  <!-- Checkbox -->
-                  <p-checkbox 
-                    [binary]="true"
-                    [ngModel]="task.completed"
-                    (onChange)="toggleTaskCompletion(task)"
-                    class="mt-1"
-                  ></p-checkbox>
+          <div *ngIf="!isLoadingTasks && !showProjectGroups">
+            <!-- Use virtual scroller for large lists (50+ items) -->
+            <!-- Virtual scrolling significantly improves memory usage and rendering performance -->
+            <p-scroller 
+              *ngIf="filteredTasks.length > 20"
+              [items]="filteredTasks" 
+              [itemSize]="120"
+              [scrollHeight]="'600px'"
+            >
+              <ng-template pTemplate="item" let-task>
+                <div class="mb-4 last:mb-0">
+                  <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-start space-x-3">
+                      <!-- Checkbox -->
+                      <p-checkbox 
+                        [binary]="true"
+                        [ngModel]="task.completed"
+                        (onChange)="toggleTaskCompletion(task)"
+                        [disabled]="isTogglingTask === task.id"
+                        class="mt-1"
+                      ></p-checkbox>
+
+                      <!-- Task Content -->
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between">
+                          <div class="flex-1">
+                            <h3 
+                              [class]="'text-lg font-medium ' + (task.completed ? 'line-through text-gray-500' : 'text-gray-900')"
+                            >
+                              {{ task.title }}
+                            </h3>
+                            
+                            <p 
+                              *ngIf="task.description"
+                              [class]="'text-sm mt-1 ' + (task.completed ? 'text-gray-400' : 'text-gray-600')"
+                            >
+                              {{ task.description }}
+                            </p>
+
+                            <!-- Task Meta -->
+                            <div class="flex flex-wrap items-center gap-2 mt-3">
+                              <!-- Priority -->
+                              <span 
+                                [class]="'px-2 py-1 text-xs font-medium rounded-full ' + getPriorityColor(task.priority)"
+                              >
+                                {{ task.priority }}
+                              </span>
+
+                              <!-- Project -->
+                              <span 
+                                *ngIf="task.projectId"
+                                [class]="'px-2 py-1 text-xs font-medium rounded-full ' + getProjectColor(task.projectId)"
+                              >
+                                {{ getProjectName(task.projectId) }}
+                              </span>
+
+                              <!-- Due Date -->
+                              <span 
+                                *ngIf="task.dueDate"
+                                [class]="'px-2 py-1 text-xs font-medium rounded-full ' + 
+                                         (isOverdue(task) ? 'bg-red-100 text-red-800' : 
+                                          isDueToday(task) ? 'bg-blue-100 text-blue-800' : 
+                                          'bg-gray-100 text-gray-600')"
+                              >
+                                <i class="pi pi-calendar mr-1"></i>
+                                {{ task.dueDate | date:'shortDate' }}
+                                <span *ngIf="isOverdue(task)" class="ml-1">(Overdue)</span>
+                                <span *ngIf="isDueToday(task)" class="ml-1">(Today)</span>
+                              </span>
+                            </div>
+                          </div>
+
+                          <!-- Actions -->
+                          <div class="flex items-center space-x-2 ml-4">
+                            <button 
+                              pButton 
+                              icon="pi pi-trash" 
+                              severity="danger"
+                              size="small"
+                              (click)="deleteTask(task)"
+                              [disabled]="isDeletingTask === task.id"
+                              [loading]="isDeletingTask === task.id"
+                              pTooltip="Delete task"
+                              class="p-button-text"
+                            ></button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ng-template>
+            </p-scroller>
+
+            <!-- Regular rendering for smaller lists -->
+            <div *ngIf="filteredTasks.length <= 20">
+              <div *ngFor="let task of filteredTasks" class="mb-4 last:mb-0">
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div class="flex items-start space-x-3">
+                    <!-- Checkbox -->
+                    <p-checkbox 
+                      [binary]="true"
+                      [ngModel]="task.completed"
+                      (onChange)="toggleTaskCompletion(task)"
+                      [disabled]="isTogglingTask === task.id"
+                      class="mt-1"
+                    ></p-checkbox>
 
                   <!-- Task Content -->
                   <div class="flex-1 min-w-0">
                     <div class="flex items-start justify-between">
                       <div class="flex-1">
                         <h3 
-                          [class]="'text-lg font-medium ' + (task.completed ? 'line-through text-gray-500' : 'text-gray-900')"
+                          [class]="'text-lg font-medium task-title ' + (task.completed ? 'line-through text-gray-500' : 'text-gray-900')"
                         >
                           {{ task.title }}
                         </h3>
                         
                         <p 
                           *ngIf="task.description"
-                          [class]="'text-sm mt-1 ' + (task.completed ? 'text-gray-400' : 'text-gray-600')"
+                          [class]="'text-sm mt-1 task-description ' + (task.completed ? 'text-gray-400' : 'text-gray-600')"
                         >
                           {{ task.description }}
                         </p>
@@ -347,6 +624,8 @@
                           severity="danger"
                           size="small"
                           (click)="deleteTask(task)"
+                          [disabled]="isDeletingTask === task.id"
+                          [loading]="isDeletingTask === task.id"
                           pTooltip="Delete task"
                           class="p-button-text"
                         ></button>
@@ -355,6 +634,7 @@
                   </div>
                 </div>
               </div>
+            </div>
             </div>
           </div>
         </p-card>
@@ -374,26 +654,50 @@
     <div class="space-y-4">
       <!-- Title -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Title *</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Title * 
+          <span class="text-xs text-gray-500">({{ (newTask.title || '').length }}/200)</span>
+        </label>
         <input 
           pInputText 
           type="text" 
           placeholder="Enter task title..."
           [(ngModel)]="newTask.title"
+          (blur)="validateTaskTitle()"
+          (input)="validateTaskTitle()"
+          [class.ng-invalid]="taskTitleError"
+          [class.ng-dirty]="taskTitleError"
+          autocomplete="off"
           class="w-full"
+          maxlength="200"
         />
+        @if (taskTitleError) {
+          <div class="text-red-600 text-xs mt-1">{{ taskTitleError }}</div>
+        }
       </div>
 
       <!-- Description -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Description
+          <span class="text-xs text-gray-500">({{ (newTask.description || '').length }}/1000)</span>
+        </label>
         <textarea 
           pTextarea 
           placeholder="Enter task description..."
           [(ngModel)]="newTask.description"
+          (blur)="validateTaskDescription()"
+          (input)="validateTaskDescription()"
+          [class.ng-invalid]="taskDescriptionError"
+          [class.ng-dirty]="taskDescriptionError"
           [rows]="3"
+          autocomplete="off"
           class="w-full"
+          maxlength="1000"
         ></textarea>
+        @if (taskDescriptionError) {
+          <div class="text-red-600 text-xs mt-1">{{ taskDescriptionError }}</div>
+        }
       </div>
 
       <!-- Priority -->
@@ -448,6 +752,8 @@
           label="Add Task" 
           icon="pi pi-check"
           (click)="addTask()"
+          [loading]="isAddingTask"
+          [disabled]="isAddingTask"
         ></button>
       </div>
     </ng-template>
@@ -458,4 +764,103 @@
 
   <!-- Confirmation Dialog -->
   <p-confirmDialog></p-confirmDialog>
+
+  <!-- Pending Changes Details Dialog -->
+  <p-dialog 
+    header="Pending Changes Details" 
+    [(visible)]="showPendingDetailsDialog" 
+    [modal]="true" 
+    [style]="{width: '600px'}"
+    [draggable]="false"
+    [resizable]="false"
+  >
+    <div *ngIf="pendingChangesSummary" class="space-y-4">
+      <!-- Summary -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="flex items-center gap-2 mb-2">
+          <i class="pi pi-info-circle text-blue-600"></i>
+          <h3 class="font-semibold text-blue-900">Summary</h3>
+        </div>
+        <p class="text-sm text-blue-800">
+          You have <strong>{{ pendingChangesSummary.total }}</strong> change{{ pendingChangesSummary.total > 1 ? 's' : '' }} 
+          waiting to be synchronized with the server.
+        </p>
+      </div>
+
+      <!-- Tasks Breakdown -->
+      <div class="border border-gray-200 rounded-lg p-4">
+        <h4 class="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <i class="pi pi-check-square text-gray-600"></i>
+          Tasks Changes
+        </h4>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="text-center p-3 bg-green-50 rounded-lg">
+            <div class="text-2xl font-bold text-green-600">{{ pendingChangesSummary.tasks.create }}</div>
+            <div class="text-xs text-gray-600 mt-1">Created</div>
+          </div>
+          <div class="text-center p-3 bg-blue-50 rounded-lg">
+            <div class="text-2xl font-bold text-blue-600">{{ pendingChangesSummary.tasks.update }}</div>
+            <div class="text-xs text-gray-600 mt-1">Updated</div>
+          </div>
+          <div class="text-center p-3 bg-red-50 rounded-lg">
+            <div class="text-2xl font-bold text-red-600">{{ pendingChangesSummary.tasks.delete }}</div>
+            <div class="text-xs text-gray-600 mt-1">Deleted</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Projects Breakdown -->
+      <div class="border border-gray-200 rounded-lg p-4">
+        <h4 class="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <i class="pi pi-folder text-gray-600"></i>
+          Projects Changes
+        </h4>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="text-center p-3 bg-green-50 rounded-lg">
+            <div class="text-2xl font-bold text-green-600">{{ pendingChangesSummary.projects.create }}</div>
+            <div class="text-xs text-gray-600 mt-1">Created</div>
+          </div>
+          <div class="text-center p-3 bg-blue-50 rounded-lg">
+            <div class="text-2xl font-bold text-blue-600">{{ pendingChangesSummary.projects.update }}</div>
+            <div class="text-xs text-gray-600 mt-1">Updated</div>
+          </div>
+          <div class="text-center p-3 bg-red-50 rounded-lg">
+            <div class="text-2xl font-bold text-red-600">{{ pendingChangesSummary.projects.delete }}</div>
+            <div class="text-xs text-gray-600 mt-1">Deleted</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Message -->
+      <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+        <div class="flex gap-2">
+          <i class="pi pi-exclamation-triangle text-yellow-600 mt-0.5"></i>
+          <div class="text-sm text-yellow-800">
+            <p class="font-medium mb-1">These changes are saved locally</p>
+            <p>Click "Sync with Server" to synchronize these changes. Your data is safe even if you close the browser.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ng-template pTemplate="footer">
+      <div class="flex justify-between items-center w-full">
+        <button 
+          pButton 
+          label="Close" 
+          severity="secondary"
+          (click)="showPendingDetailsDialog = false"
+          class="p-button-text"
+        ></button>
+        <button 
+          pButton 
+          label="Sync Now" 
+          icon="pi pi-refresh"
+          (click)="syncWithServer(); showPendingDetailsDialog = false"
+          [disabled]="!isOnline"
+          class="p-button-success"
+        ></button>
+      </div>
+    </ng-template>
+  </p-dialog>
 </div>

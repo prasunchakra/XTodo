@@ -210,7 +210,14 @@ export class StorageService {
     try {
       localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
+      // Enhanced error handling for storage failures
       console.error('Failed to save to localStorage:', error);
+      
+      // Check for quota exceeded error
+      if (error instanceof DOMException && 
+          (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+        console.error('Storage quota exceeded. Consider clearing old data or using IndexedDB.');
+      }
     }
   }
 
@@ -226,7 +233,18 @@ export class StorageService {
         return this.convertDates(parsed) as T;
       }
     } catch (error) {
+      // Enhanced error handling for data corruption or parsing errors
       console.error('Failed to load from localStorage:', error);
+      
+      // If data is corrupted, clear it and use default value
+      if (error instanceof SyntaxError) {
+        console.warn(`Corrupted data found for key: ${key}, clearing and using default value`);
+        try {
+          localStorage.removeItem(key);
+        } catch (e) {
+          console.error('Failed to clear corrupted data:', e);
+        }
+      }
     }
     return defaultValue;
   }
